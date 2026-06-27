@@ -28,6 +28,7 @@ function showView(name) {
   if (name === 'review') renderReview();
   if (name === 'glossary') renderGlossary();
   if (name === 'settings') renderSettings();
+  if (name === 'reader') renderReader();
 }
 
 $$('.nav-item').forEach((btn) => {
@@ -123,6 +124,7 @@ async function openProject(id) {
   const project = await window.api.getProject(id);
   currentProject = project;
   currentProjectId = id;
+  readerProjectId = null; // force the Reader to rebuild with fresh content
 
   // Populate header + settings fields.
   $('#ws-title').textContent = project.name;
@@ -1223,6 +1225,183 @@ async function saveSettingsForm() {
 $('#set-test').addEventListener('click', () => runConnectionTest($('#set-url').value, $('#set-test-result')));
 $('#set-theme').addEventListener('change', (e) => applyTheme(e.target.value));
 $('#set-lang').addEventListener('change', (e) => setLang(e.target.value));
+
+// ============================================================================
+//  Reader — read the finished translation as a book
+// ============================================================================
+const RD_FONTS = { serif: 'var(--font-serif)', amiri: "'Amiri', serif", sans: 'var(--font-ui)' };
+const RD_WIDTHS = { narrow: '620px', medium: '760px', wide: '920px' };
+let readerProjectId = null;
+let rdOffsets = []; // [{ id, top }] sorted by top, for fast position lookup
+
+// Render inline Markdown emphasis to HTML (escaped first).
+function inlineMd(text) {
+  let s = escapeHtml(text);
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/__([^_]+)__/g, '<strong>$1</strong>');
+  s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>').replace(/_([^_]+)_/g, '<em>$1</em>');
+  return s;
+}
+const stripMd = (t) => String(t).replace(/[*_]/g, '');
+
+// Build the book HTML from the project's segments (translation, original as fallback).
+function buildReaderHtml(project) {
+  const parts = [];
+  let listOpen = null;
+  const closeList = () => { if (listOpen) { parts.push(`</${listOpen}>`); listOpen = null; } };
+
+  for (const s of project.segments) {
+    const id = s.id;
+    const type = s.type || 'paragraph';
+    if (type === 'scene-break') { closeList(); parts.push(`<div class="rd-scene" id="rd-seg-${id}" data-seg="${id}">⁂</div>`); continue; }
+    const txt = (s.translation && s.translation.trim()) ? s.translation.trim() : s.original;
+    if (!txt) continue;
+    const html = inlineMd(txt);
+    if (type === 'list-item') {
+      const want = s.ordered ? 'ol' : 'ul';
+      if (listOpen !== want) { closeList(); parts.push(`<${want}>`); listOpen = want; }
+      parts.push(`<li id="rd-seg-${id}" data-seg="${id}">${html}</li>`);
+      continue;
+    }
+    closeList();
+    if (type === 'heading') {
+      const lvl = Math.min(Math.max(s.level || 2, 1), 6);
+      parts.push(`<h${lvl} class="rd-h" id="rd-seg-${id}" data-seg="${id}">${html}</h${lvl}>`);
+    } else if (type === 'blockquote') {
+      parts.push(`<blockquote id="rd-seg-${id}" data-seg="${id}">${html}</blockquote>`);
+    } else if (type === 'verse') {
+      parts.push(`<p class="rd-verse" id="rd-seg-${id}" data-seg="${id}">${html.replace(/\n/g, '<br/>')}</p>`);
+    } else {
+      parts.push(`<p id="rd-seg-${id}" data-seg="${id}">${html}</p>`);
+    }
+  }
+  closeList();
+  return parts.join('');
+}
+
+function buildToc(project) {
+  const toc = $('#rd-toc');
+  const headings = project.segments.filter((s) => (s.type || '') === 'heading' && (s.original || '').trim());
+  if (headings.length === 0) { toc.innerHTML = ''; toc.hidden = true; $('#rd-toc-btn').style.display = 'none'; return; }
+  $('#rd-toc-btn').style.display = '';
+  toc.innerHTML = headings.map((h) => {
+    const text = (h.translation && h.translation.trim()) ? h.translation.trim() : h.original;
+    return `<button class="rd-toc-item lvl-${Math.min(h.level || 1, 3)}" data-go="${h.id}">${escapeHtml(stripMd(text)).slice(0, 90)}</button>`;
+  }).join('');
+}
+
+function readerPrefs() {
+  let p = {};
+  try { p = JSON.parse(localStorage.getItem('reader-prefs')) || {}; } catch { /* ignore */ }
+  return { font: 'serif', size: 18, width: 'medium', theme: 'dark', ...p };
+}
+function saveReaderPrefs(p) { localStorage.setItem('reader-prefs', JSON.stringify(p)); }
+
+function applyReaderPrefs() {
+  const p = readerPrefs();
+  const content = $('#rd-content');
+  content.style.fontFamily = RD_FONTS[p.font] || RD_FONTS.serif;
+  content.style.fontSize = `${p.size}px`;
+  content.style.maxWidth = RD_WIDTHS[p.width] || RD_WIDTHS.medium;
+  const scroll = $('#rd-scroll');
+  scroll.classList.remove('rd-dark', 'rd-sepia', 'rd-light');
+  scroll.classList.add(`rd-${p.theme}`);
+  $('#rd-font').value = p.font; $('#rd-width').value = p.width; $('#rd-theme').value = p.theme;
+}
+
+function indexReaderOffsets() {
+  rdOffsets = Array.from($('#rd-content').querySelectorAll('[data-seg]'))
+    .map((el) => ({ id: el.dataset.seg, top: el.offsetTop }));
+}
+function topmostSeg() {
+  if (!rdOffsets.length) return null;
+  const y = $('#rd-scroll').scrollTop + 12;
+  let lo = 0, hi = rdOffsets.length - 1, ans = rdOffsets[0].id;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (rdOffsets[m].top <= y) { ans = rdOffsets[m].id; lo = m + 1; } else hi = m - 1; }
+  return ans;
+}
+function updateReadProgress() {
+  const s = $('#rd-scroll');
+  const max = s.scrollHeight - s.clientHeight;
+  const pct = max > 0 ? Math.min(100, Math.round((s.scrollTop / max) * 100)) : 0;
+  $('#rd-progress-fill').style.width = `${pct}%`;
+}
+
+function renderReader() {
+  if (!currentProject) {
+    $('#reader-empty').hidden = false;
+    $('#reader-panel').hidden = true;
+    return;
+  }
+  $('#reader-empty').hidden = true;
+  $('#reader-panel').hidden = false;
+  $('#rd-title').textContent = currentProject.name;
+
+  const content = $('#rd-content');
+  const rebuild = readerProjectId !== currentProject.id || !content.hasChildNodes();
+  if (rebuild) {
+    content.innerHTML = buildReaderHtml(currentProject);
+    content.dir = isRtlLang(currentProject.targetLang) ? 'rtl' : 'ltr';
+    buildToc(currentProject);
+    $('#rd-toc').hidden = true;
+    readerProjectId = currentProject.id;
+  }
+  applyReaderPrefs();
+  requestAnimationFrame(() => {
+    indexReaderOffsets();
+    if (rebuild) {
+      const pos = localStorage.getItem(`reader-pos:${currentProject.id}`);
+      const found = pos && rdOffsets.find((o) => o.id === String(pos));
+      $('#rd-scroll').scrollTop = found ? found.top : 0;
+    }
+    updateReadProgress();
+  });
+}
+
+// Change a typography pref while keeping the reader's place (re-anchor on the
+// segment that was at the top before the reflow).
+function setReaderPref(key, value, reflow) {
+  const p = readerPrefs();
+  p[key] = value;
+  saveReaderPrefs(p);
+  if (!reflow) { applyReaderPrefs(); return; }
+  const seg = topmostSeg();
+  applyReaderPrefs();
+  requestAnimationFrame(() => {
+    indexReaderOffsets();
+    const o = seg && rdOffsets.find((x) => x.id === String(seg));
+    if (o) $('#rd-scroll').scrollTop = o.top;
+    updateReadProgress();
+  });
+}
+function bumpReaderSize(delta) {
+  const p = readerPrefs();
+  setReaderPref('size', Math.min(32, Math.max(12, p.size + delta)), true);
+}
+
+// Wiring
+$('#rd-font').addEventListener('change', (e) => setReaderPref('font', e.target.value, true));
+$('#rd-width').addEventListener('change', (e) => setReaderPref('width', e.target.value, true));
+$('#rd-theme').addEventListener('change', (e) => setReaderPref('theme', e.target.value, false));
+$('#rd-bigger').addEventListener('click', () => bumpReaderSize(1));
+$('#rd-smaller').addEventListener('click', () => bumpReaderSize(-1));
+$('#rd-toc-btn').addEventListener('click', () => { $('#rd-toc').hidden = !$('#rd-toc').hidden; });
+$('#rd-toc').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-go]');
+  if (!b) return;
+  const el = document.getElementById(`rd-seg-${b.dataset.go}`);
+  if (el) el.scrollIntoView({ block: 'start' });
+});
+
+let rdPosTimer;
+$('#rd-scroll').addEventListener('scroll', () => {
+  updateReadProgress();
+  clearTimeout(rdPosTimer);
+  rdPosTimer = setTimeout(() => {
+    if (!currentProject) return;
+    const seg = topmostSeg();
+    if (seg != null) localStorage.setItem(`reader-pos:${currentProject.id}`, seg);
+  }, 400);
+});
 
 // ---- Boot -------------------------------------------------------------------
 setLang(localStorage.getItem('lang') || 'en');   // applies static i18n + fires langchange → renderLibrary
