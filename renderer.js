@@ -1,0 +1,1195 @@
+// Renderer — the UI logic. Runs in the page with no Node access; it talks to
+// the main process only through window.api (defined in preload.js).
+
+// ---- Tiny helpers -----------------------------------------------------------
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+function toast(message) {
+  const el = $('#toast');
+  el.textContent = message;
+  el.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+// ---- View navigation --------------------------------------------------------
+let currentProjectId = null;
+
+function showView(name) {
+  $$('.nav-item').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
+  $$('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${name}`));
+  if (name === 'review') renderReview();
+  if (name === 'glossary') renderGlossary();
+}
+
+$$('.nav-item').forEach((btn) => {
+  btn.addEventListener('click', () => showView(btn.dataset.view));
+});
+
+// ---- Library ----------------------------------------------------------------
+async function renderLibrary() {
+  const body = $('#library-body');
+  const projects = await window.api.listProjects();
+
+  if (projects.length === 0) {
+    body.innerHTML = `
+      <div class="empty">
+        <h2>${t('lib.emptyTitle')}</h2>
+        <p>${t('lib.emptyBody')}</p>
+        <button class="btn btn-primary" id="empty-new">${t('lib.emptyBtn')}</button>
+      </div>`;
+    $('#empty-new').addEventListener('click', openNewProjectModal);
+    return;
+  }
+
+  body.innerHTML = `<div class="project-grid">${projects.map(cardHtml).join('')}</div>`;
+
+  // Wire each card.
+  $$('.project-card').forEach((card) => {
+    const id = card.dataset.id;
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.card-actions')) return; // let action buttons handle themselves
+      openProject(id);
+    });
+    // Keyboard: Enter/Space opens the focused card.
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openProject(id); }
+    });
+    card.querySelector('.js-open').addEventListener('click', () => openProject(id));
+    card.querySelector('.js-delete').addEventListener('click', () => deleteProject(id, card));
+  });
+}
+
+function cardHtml(p) {
+  const { total, translated, reviewed } = p.counts;
+  const pct = total ? Math.round((translated / total) * 100) : 0;
+  return `
+    <div class="project-card" data-id="${p.id}" tabindex="0">
+      <div>
+        <h3>${escapeHtml(p.name)}</h3>
+        <div class="langs">${escapeHtml(p.sourceLang)} → ${escapeHtml(p.targetLang)}</div>
+      </div>
+      <div class="progress">
+        <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div class="progress-meta">${t('stats', { t: translated, n: total, r: reviewed })}</div>
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-ghost btn-sm js-open">${t('card.open')}</button>
+        <button class="btn btn-danger btn-sm js-delete">${t('card.delete')}</button>
+      </div>
+    </div>`;
+}
+
+async function deleteProject(id, cardEl) {
+  const name = cardEl.querySelector('h3').textContent;
+  if (!confirm(t('confirm.delete', { name }))) return;
+  await window.api.deleteProject(id);
+  toast(t('toast.deleted'));
+  renderLibrary();
+}
+
+// ---- Workspace / Control Center --------------------------------------------
+let currentProject = null; // full project object of the open project
+let isRunning = false;
+
+function countStatuses(segments) {
+  return segments.reduce(
+    (acc, s) => {
+      acc.total++;
+      if (s.status === 'reviewed') { acc.reviewed++; acc.translated++; }
+      else if (s.status === 'translated') acc.translated++;
+      return acc;
+    },
+    { total: 0, translated: 0, reviewed: 0 }
+  );
+}
+
+function renderProgress(counts) {
+  const pct = counts.total ? Math.round((counts.translated / counts.total) * 100) : 0;
+  $('#ws-bar').style.width = `${pct}%`;
+  $('#ws-counter').textContent =
+    t('stats', { t: counts.translated, n: counts.total, r: counts.reviewed });
+}
+
+async function openProject(id) {
+  const project = await window.api.getProject(id);
+  currentProject = project;
+  currentProjectId = id;
+
+  // Populate header + settings fields.
+  $('#ws-title').textContent = project.name;
+  $('#ws-langs').textContent = `${project.sourceLang} → ${project.targetLang}`;
+  $('#ws-name').value = project.name;
+  $('#ws-source').value = project.sourceLang;
+  $('#ws-target').value = project.targetLang;
+  $('#ws-url').value = project.apiUrl;
+  $('#ws-model').value = project.model || '';
+  $('#ws-context').value = project.contextWindow;
+  $('#ws-style').value = project.styleBrief || '';
+
+  renderProgress(countStatuses(project.segments));
+  clearError();
+  updatePrimaryAction();
+
+  $('#workspace-empty').hidden = true;
+  $('#workspace-panel').hidden = false;
+  showView('workspace');
+}
+
+// Auto-save settings whenever a field changes.
+async function saveSettings() {
+  if (!currentProject) return;
+  currentProject.name = $('#ws-name').value.trim() || 'Untitled Project';
+  currentProject.sourceLang = $('#ws-source').value.trim() || 'Source';
+  currentProject.targetLang = $('#ws-target').value.trim() || 'Target';
+  currentProject.apiUrl = $('#ws-url').value.trim();
+  currentProject.model = $('#ws-model').value.trim();
+  currentProject.contextWindow = Math.max(0, parseInt($('#ws-context').value, 10) || 0);
+  currentProject.styleBrief = $('#ws-style').value.trim();
+
+  $('#ws-title').textContent = currentProject.name;
+  $('#ws-langs').textContent = `${currentProject.sourceLang} → ${currentProject.targetLang}`;
+
+  await window.api.saveProject(currentProject);
+}
+
+['#ws-name', '#ws-source', '#ws-target', '#ws-url', '#ws-model', '#ws-context', '#ws-style']
+  .forEach((sel) => $(sel).addEventListener('change', saveSettings));
+
+// ---- Activity log -----------------------------------------------------------
+function logLine(message, level = 'info') {
+  const log = $('#ws-log');
+  // Only auto-scroll if the user is already near the bottom (lets them read history).
+  const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+  const line = document.createElement('div');
+  line.className = `log-line ${level}`;
+  const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  line.innerHTML = `<span class="ts">${ts}</span>${escapeHtml(message)}`;
+  log.appendChild(line);
+  if (nearBottom) log.scrollTop = log.scrollHeight;
+}
+
+function showError(message) {
+  clearError();
+  const banner = document.createElement('div');
+  banner.className = 'error-banner';
+  banner.id = 'ws-error';
+  banner.innerHTML = `<strong>${t('err.banner')}</strong> ${escapeHtml(message)}`;
+  $('#workspace-panel').insertBefore(banner, $('#workspace-panel').children[1]);
+}
+function clearError() {
+  const existing = $('#ws-error');
+  if (existing) existing.remove();
+}
+
+// ---- Run controls -----------------------------------------------------------
+function setEngineRunning(on) {
+  isRunning = on;
+  const btn = $('#ws-run');
+  btn.textContent = on ? t('ws.stop') : t('ws.start');
+  btn.classList.toggle('btn-stop', on);
+  // Lock settings while a run is in progress.
+  ['#ws-name', '#ws-source', '#ws-target', '#ws-url', '#ws-model', '#ws-context', '#ws-style']
+    .forEach((sel) => { $(sel).disabled = on; });
+
+  // Review controls: disable editing actions; "↻ All" becomes a Stop control.
+  ['#rv-retrans-seg', '#rv-prev', '#rv-next', '#rv-save', '#rv-review-all', '#rv-fr']
+    .forEach((sel) => { const el = $(sel); if (el) el.disabled = on; });
+  const all = $('#rv-retrans-all');
+  if (all) { all.textContent = on ? t('rv.stop') : t('rv.all'); all.classList.toggle('btn-stop', on); }
+}
+
+async function toggleRun() {
+  if (!currentProject) return;
+  if (isRunning) {
+    $('#ws-run').disabled = true;
+    logLine(t('ws.stopping'), 'info');
+    await window.api.stopTranslation();
+    return;
+  }
+  clearError();
+  setEngineRunning(true);
+  await window.api.startTranslation(currentProject.id);
+}
+
+$('#ws-run').addEventListener('click', toggleRun);
+
+// ---- Test connection --------------------------------------------------------
+async function testConnection() {
+  const out = $('#ws-test-result');
+  const url = $('#ws-url').value.trim();
+  out.className = 'test-result busy';
+  out.textContent = t('test.testing');
+  const r = await window.api.testConnection(url);
+  out.className = 'test-result ' + (r.ok ? 'ok' : 'bad');
+  out.textContent = (r.ok ? '✓ ' : '✕ ') + t('test.' + r.code, r.params);
+}
+$('#ws-test').addEventListener('click', testConnection);
+
+// ---- Export -----------------------------------------------------------------
+let exportFormat = localStorage.getItem('exportFormat') || 'pdf';
+
+function openExportModal() {
+  if (!currentProject) return;
+  const c = countStatuses(currentProject.segments);
+  const untranslated = currentProject.segments.filter((s) => !(s.translation && s.translation.trim())).length;
+  $('#export-sub').textContent =
+    `“${currentProject.name}” · ${currentProject.sourceLang} → ${currentProject.targetLang}`;
+  $('#export-status').innerHTML = untranslated > 0
+    ? `<span class="warn">${escapeHtml(t('ex.statusWarn', { u: untranslated, n: c.total }))}</span>`
+    : escapeHtml(t('ex.statusAll', { n: c.total }));
+  selectExportFormat(exportFormat);
+  $('#export-modal').classList.add('open');
+}
+function closeExportModal() { $('#export-modal').classList.remove('open'); }
+
+function selectExportFormat(fmt) {
+  exportFormat = fmt;
+  $$('#export-formats .format-opt').forEach((b) => b.classList.toggle('active', b.dataset.fmt === fmt));
+  $('#export-go').textContent = t('ex.go', { fmt: fmt.toUpperCase() });
+}
+
+async function doExport() {
+  const fmt = exportFormat;
+  localStorage.setItem('exportFormat', fmt);
+  closeExportModal();
+  const r = await window.api.exportProject(currentProject.id, fmt);
+  if (!r || r.canceled) return;
+  const F = (r.format || fmt).toUpperCase();
+  if (r.untranslated > 0) {
+    toast(t('toast.exportedWarn', { fmt: F, u: r.untranslated, n: r.total }));
+    logLine(t('log.exportedWarn', { fmt: F, path: r.path, u: r.untranslated, n: r.total }), 'info');
+  } else {
+    toast(t('toast.exported', { n: r.total, fmt: F }));
+    logLine(t('log.exported', { fmt: F, path: r.path }), 'success');
+  }
+}
+
+// The Workspace's secondary button exports the current project.
+function updatePrimaryAction() {
+  $('#ws-export').textContent = t('ws.export');
+}
+
+$('#ws-export').addEventListener('click', openExportModal);
+$('#export-formats').addEventListener('click', (e) => {
+  const opt = e.target.closest('.format-opt');
+  if (opt) selectExportFormat(opt.dataset.fmt);
+});
+$('#export-go').addEventListener('click', doExport);
+$('#export-cancel').addEventListener('click', closeExportModal);
+$('#export-modal').addEventListener('click', (e) => { if (e.target.id === 'export-modal') closeExportModal(); });
+
+// Stream of engine events from the main process.
+window.api.onEngineEvent(async (ev) => {
+  switch (ev.type) {
+    case 'started':
+      if (ev.mode !== 'single') logLine(t('log.runStarted'), 'info');
+      break;
+    case 'progress':
+      renderProgress(ev.counts);
+      break;
+    case 'segment':
+      applyLiveSegment(ev);
+      logLine(t('log.segTranslated', { n: ev.index + 1 }), 'success');
+      break;
+    case 'log':
+      logLine(t('log.' + ev.key, ev.params), ev.level || 'info');
+      break;
+    case 'error':
+      logLine(t('log.runHalted'), 'error');
+      showError(t('err.' + ev.key, ev.params));
+      setEngineRunning(false);
+      $('#ws-run').disabled = false;
+      break;
+    case 'done':
+      if (ev.counts) renderProgress(ev.counts);
+      if (ev.reason === 'completed') { logLine(t('log.allTranslated'), 'success'); toast(t('toast.complete')); }
+      else if (ev.reason === 'stopped') { logLine(t('log.stopped'), 'info'); }
+      setEngineRunning(false);
+      $('#ws-run').disabled = false;
+      // Refresh the in-memory project so Review sees the new text.
+      if (currentProjectId) currentProject = await window.api.getProject(currentProjectId);
+      refreshReviewIfActive();
+      break;
+  }
+});
+
+// Apply a single freshly-translated segment to the in-memory project + Review UI.
+function applyLiveSegment(ev) {
+  if (!currentProject) return;
+  const seg = currentProject.segments.find((s) => s.id === ev.id) || currentProject.segments[ev.index];
+  if (!seg) return;
+  seg.translation = ev.translation;
+  seg.status = ev.status;
+  if ($('#view-review').classList.contains('active')) {
+    renderNavWindow();
+    const open = currentProject.segments[reviewIndex];
+    if (!reviewDirty && open && open.id === seg.id) {
+      $('#rv-translation').value = ev.translation;
+      updateEditorHead();
+    }
+  }
+}
+
+// ---- New Project modal ------------------------------------------------------
+let pickedManuscript = null; // { fileName, text }
+
+function openNewProjectModal() {
+  pickedManuscript = null;
+  $('#np-file-label').textContent = t('np.noFile');
+  $('#np-file').classList.remove('chosen');
+  $('#np-name').value = '';
+  $('#np-source').value = 'English';
+  $('#np-target').value = 'Arabic';
+  $('#np-create').disabled = true;
+  $('#new-project-modal').classList.add('open');
+}
+
+function closeNewProjectModal() {
+  $('#new-project-modal').classList.remove('open');
+}
+
+async function pickFile() {
+  const result = await window.api.pickManuscript();
+  if (!result) return; // cancelled
+
+  if (result.error) {                       // parse failure (corrupt EPUB/DOCX, etc.)
+    pickedManuscript = null;
+    $('#np-create').disabled = true;
+    toast(t('toast.importError'));
+    return;
+  }
+  if (Array.isArray(result.blocks) && result.blocks.length === 0) {
+    pickedManuscript = null;
+    $('#np-create').disabled = true;
+    toast(t('toast.importEmpty'));
+    return;
+  }
+
+  pickedManuscript = result;
+  $('#np-file-label').textContent = result.fileName;
+  $('#np-file').classList.add('chosen');
+  // Pre-fill name from the embedded title (EPUB) or the filename, if empty.
+  if (!$('#np-name').value.trim()) {
+    $('#np-name').value = (result.title && result.title.trim())
+      || result.fileName.replace(/\.[^.]+$/, '');
+  }
+  $('#np-create').disabled = false;
+}
+
+async function createProject() {
+  if (!pickedManuscript) return;
+  const input = {
+    name: $('#np-name').value,
+    text: pickedManuscript.text,     // for txt/md
+    blocks: pickedManuscript.blocks, // for EPUB/DOCX (store picks whichever is set)
+    settings: {
+      sourceLang: $('#np-source').value.trim() || 'Source',
+      targetLang: $('#np-target').value.trim() || 'Target',
+    },
+  };
+  $('#np-create').disabled = true;
+  const project = await window.api.createProject(input);
+  closeNewProjectModal();
+  toast(t('toast.created', { name: project.name, n: project.segments.length }));
+  await renderLibrary();
+}
+
+// Modal wiring
+$('#new-project-btn').addEventListener('click', openNewProjectModal);
+$('#np-cancel').addEventListener('click', closeNewProjectModal);
+$('#np-pick-btn').addEventListener('click', pickFile);
+$('#np-create').addEventListener('click', createProject);
+$('#new-project-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'new-project-modal') closeNewProjectModal(); // click backdrop to close
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeNewProjectModal(); closeRetransModal(); closeExportModal(); closeFrModal(); }
+});
+
+// ============================================================================
+//  Review — Split-Screen Editor
+// ============================================================================
+const RTL_LANGS = ['arabic', 'hebrew', 'persian', 'farsi', 'urdu', 'pashto', 'kurdish', 'yiddish', 'dhivehi'];
+function isRtlLang(lang) {
+  return RTL_LANGS.includes(String(lang || '').trim().toLowerCase());
+}
+
+const ITEM_H = 54; // px per navigator row (fixed height enables virtualization)
+let reviewIndex = 0;
+let reviewDirty = false;
+let reviewProjectId = null;
+let navFilter = null; // array of segment indices when filtering, else null (= all)
+let navStatusFilter = null; // 'pending' | 'translated' | 'reviewed' | null (= all)
+
+function statusClass(status) {
+  return status === 'reviewed' ? 'status-reviewed'
+       : status === 'translated' ? 'status-translated'
+       : 'status-pending';
+}
+
+// Human label for a segment's structural type (heading shows its level).
+function segTypeLabel(seg) {
+  const type = seg.type || 'paragraph';
+  if (type === 'heading') return t('segtype.heading', { level: seg.level || 1 });
+  return t('segtype.' + type);
+}
+
+// Render only the navigator rows currently in view (virtual scrolling).
+function renderNavWindow() {
+  if (!currentProject) return;
+  const scroll = $('#rv-nav-scroll');
+  const spacer = $('#rv-nav-spacer');
+  const segs = currentProject.segments;
+  const list = navFilter;                       // null = show every segment
+  const count = list ? list.length : segs.length;
+  spacer.style.height = `${count * ITEM_H}px`;
+
+  const overscan = 6;
+  let start = Math.max(0, Math.floor(scroll.scrollTop / ITEM_H) - overscan);
+  let end = Math.min(count, Math.ceil((scroll.scrollTop + scroll.clientHeight) / ITEM_H) + overscan);
+
+  spacer.querySelectorAll('.nav-item-row').forEach((r) => r.remove());
+  const frag = document.createDocumentFragment();
+  for (let k = start; k < end; k++) {
+    const idx = list ? list[k] : k;             // actual segment index
+    const seg = segs[idx];
+    const row = document.createElement('div');
+    row.className = 'nav-item-row' + (idx === reviewIndex ? ' active' : '');
+    row.style.top = `${k * ITEM_H}px`;
+    row.style.height = `${ITEM_H}px`;
+    const snippet = seg.type === 'scene-break'
+      ? '⁂'
+      : escapeHtml((seg.translation || seg.original || '').slice(0, 42));
+    const typeTag = seg.type && seg.type !== 'paragraph' && seg.type !== 'scene-break'
+      ? `<span class="seg-type">${escapeHtml(segTypeLabel(seg))}</span>` : '';
+    row.innerHTML =
+      `<span class="num">${idx + 1}</span>` +
+      `<span class="dot ${statusClass(seg.status)}"></span>` +
+      `<span class="snippet">${typeTag}${snippet}</span>`;
+    row.addEventListener('click', () => selectSegment(idx));
+    frag.appendChild(row);
+  }
+  spacer.appendChild(frag);
+}
+
+function ensureRowVisible(idx) {
+  const scroll = $('#rv-nav-scroll');
+  const pos = navFilter ? navFilter.indexOf(idx) : idx; // row position in the visible list
+  if (pos < 0) return;                                  // not in current filter
+  const top = pos * ITEM_H;
+  const bottom = top + ITEM_H;
+  if (top < scroll.scrollTop) scroll.scrollTop = top;
+  else if (bottom > scroll.scrollTop + scroll.clientHeight) scroll.scrollTop = bottom - scroll.clientHeight;
+}
+
+// Filter the navigator by status chip AND/OR search text (combined).
+function recomputeNavFilter(resetScroll = false) {
+  if (!currentProject) return;
+  const q = $('#rv-search').value.trim().toLowerCase();
+  const status = navStatusFilter;
+
+  if (!q && !status) {
+    navFilter = null;
+    $('#rv-nav-title').textContent = t('rv.segments', { n: currentProject.segments.length });
+  } else {
+    navFilter = [];
+    currentProject.segments.forEach((s, i) => {
+      if (status && s.status !== status) return;
+      if (q && !((s.original && s.original.toLowerCase().includes(q)) ||
+                 (s.translation && s.translation.toLowerCase().includes(q)))) return;
+      navFilter.push(i);
+    });
+    $('#rv-nav-title').textContent = t('rv.matches', { n: navFilter.length });
+  }
+  if (resetScroll) $('#rv-nav-scroll').scrollTop = 0;
+  renderNavWindow();
+}
+
+// Update the per-status counts shown on the filter chips.
+function updateFilterCounts() {
+  if (!currentProject) return;
+  let p = 0, tr = 0, rv = 0;
+  for (const s of currentProject.segments) {
+    if (s.status === 'reviewed') rv += 1;
+    else if (s.status === 'translated') tr += 1;
+    else p += 1;
+  }
+  $('#fc-all').textContent = currentProject.segments.length;
+  $('#fc-pending').textContent = p;
+  $('#fc-translated').textContent = tr;
+  $('#fc-reviewed').textContent = rv;
+}
+
+// Click a status chip to filter (clicking the active one clears it back to All).
+function setStatusFilter(status) {
+  navStatusFilter = status === 'all' ? null : status;
+  $$('#rv-filters .nav-filter').forEach((b) =>
+    b.classList.toggle('active', b.dataset.status === (navStatusFilter || 'all')));
+  recomputeNavFilter(true);
+}
+
+function updateEditorHead() {
+  const seg = currentProject.segments[reviewIndex];
+  const pos = t('ed.position', { n: reviewIndex + 1, m: currentProject.segments.length });
+  const type = seg.type || 'paragraph';
+  $('#rv-position').textContent = type === 'paragraph' ? pos : `${segTypeLabel(seg)} · ${pos}`;
+  const st = $('#rv-status');
+  st.textContent = t('status.' + seg.status);
+  st.className = `ed-status ${seg.status}`;
+}
+
+// Persist the current segment. markReviewed=true sets status to 'reviewed'.
+async function persistCurrent(markReviewed) {
+  if (!currentProject) return;
+  const seg = currentProject.segments[reviewIndex];
+  const text = $('#rv-translation').value;
+  const fields = { translation: text };
+  if (markReviewed) fields.status = 'reviewed';
+  else if (seg.status === 'pending' && text.trim()) fields.status = 'translated';
+
+  Object.assign(seg, fields); // update in-memory copy
+  reviewDirty = false;
+  await window.api.updateSegment(currentProject.id, seg.id, fields);
+  updateEditorHead();
+  updateFilterCounts();
+  renderNavWindow();
+}
+
+async function selectSegment(i) {
+  if (reviewDirty) await persistCurrent(false); // keep unsaved text, don't mark reviewed
+  reviewIndex = Math.max(0, Math.min(currentProject.segments.length - 1, i));
+  const seg = currentProject.segments[reviewIndex];
+
+  const original = $('#rv-original');
+  const ta = $('#rv-translation');
+  const isDivider = seg.type === 'scene-break';
+  const q = $('#rv-search').value.trim();
+  if (isDivider) original.textContent = '⁂   scene break   ⁂';
+  else original.innerHTML = markHtml(seg.original, q); // highlight search matches
+  ta.value = isDivider ? '' : (seg.translation || '');
+  ta.disabled = isDivider;          // scene breaks aren't translated
+  ta.placeholder = isDivider ? t('ed.dividerPh') : '';
+  original.dir = isRtlLang(currentProject.sourceLang) ? 'rtl' : 'ltr';
+  ta.dir = isRtlLang(currentProject.targetLang) ? 'rtl' : 'auto';
+
+  // If searching, jump the caret to the first match in the translation so it's
+  // selected and ready to edit (only when navigating, not while typing search).
+  if (q && !isDivider && seg.translation) {
+    const idx = seg.translation.toLowerCase().indexOf(q.toLowerCase());
+    if (idx >= 0) { ta.focus(); ta.setSelectionRange(idx, idx + q.length); }
+  }
+
+  reviewDirty = false;
+  updateEditorHead();
+  renderNavWindow();
+  ensureRowVisible(reviewIndex);
+}
+
+// Escape HTML, then wrap occurrences of `query` in <mark> for the original pane.
+function markHtml(text, query) {
+  if (!query) return escapeHtml(text);
+  const re = new RegExp('(' + escapeRegExp(query) + ')', 'gi');
+  return String(text).split(re)
+    .map((part, i) => (i % 2 === 1 ? `<mark>${escapeHtml(part)}</mark>` : escapeHtml(part)))
+    .join('');
+}
+
+// Re-highlight the current original pane as the search text changes (no focus change).
+function highlightOriginal() {
+  if (!currentProject) return;
+  const seg = currentProject.segments[reviewIndex];
+  if (!seg || seg.type === 'scene-break') return;
+  $('#rv-original').innerHTML = markHtml(seg.original, $('#rv-search').value.trim());
+}
+
+async function saveAndReview() {
+  await persistCurrent(true);
+  const tag = $('#rv-saved');
+  tag.textContent = t('ed.saved');
+  tag.classList.add('show');
+  clearTimeout(saveAndReview._t);
+  saveAndReview._t = setTimeout(() => tag.classList.remove('show'), 1600);
+}
+
+function renderReview() {
+  if (!currentProject) {
+    $('#review-empty').hidden = false;
+    $('#review-panel').hidden = true;
+    return;
+  }
+  $('#review-empty').hidden = true;
+  $('#review-panel').hidden = false;
+
+  $('#rv-source-label').textContent = t('pane.original', { lang: currentProject.sourceLang });
+  $('#rv-target-label').textContent = t('pane.translation', { lang: currentProject.targetLang });
+  $('#rv-search').value = '';
+  navFilter = null;
+  navStatusFilter = null;
+  $$('#rv-filters .nav-filter').forEach((b) => b.classList.toggle('active', b.dataset.status === 'all'));
+  updateFilterCounts();
+  $('#rv-nav-title').textContent = t('rv.segments', { n: currentProject.segments.length });
+
+  // When opening a different project, jump to the first segment needing attention.
+  if (reviewProjectId !== currentProject.id) {
+    reviewProjectId = currentProject.id;
+    const firstUnreviewed = currentProject.segments.findIndex((s) => s.status !== 'reviewed');
+    reviewIndex = firstUnreviewed === -1 ? 0 : firstUnreviewed;
+  }
+  renderNavWindow();
+  selectSegment(reviewIndex);
+}
+
+// Refresh Review in place after a background run finishes (keeps position).
+function refreshReviewIfActive() {
+  if (!$('#view-review').classList.contains('active') || !currentProject) return;
+  updateFilterCounts();
+  if (navStatusFilter || navFilter) recomputeNavFilter(false); // membership may have changed
+  else renderNavWindow();
+  if (!reviewDirty) {
+    const seg = currentProject.segments[reviewIndex];
+    if (seg) { $('#rv-translation').value = seg.translation || ''; updateEditorHead(); }
+  }
+}
+
+// Wiring
+$('#rv-nav-scroll').addEventListener('scroll', renderNavWindow);
+$('#rv-search').addEventListener('input', () => { recomputeNavFilter(true); highlightOriginal(); });
+$('#rv-filters').addEventListener('click', (e) => {
+  const btn = e.target.closest('.nav-filter');
+  if (btn) setStatusFilter(btn.dataset.status);
+});
+
+// ---- Find & replace across translations -------------------------------------
+function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function frRegex() {
+  const term = $('#fr-find').value;
+  if (!term) return null;
+  return new RegExp(escapeRegExp(term), $('#fr-case').checked ? 'g' : 'gi');
+}
+
+// Live preview: how many matches across how many segments' translations.
+function frUpdateCount() {
+  const out = $('#fr-count');
+  const re = frRegex();
+  if (!re || !currentProject) { out.textContent = ''; $('#fr-go').disabled = true; return; }
+  let matches = 0, segs = 0;
+  for (const s of currentProject.segments) {
+    if (!s.translation) continue;
+    const m = s.translation.match(re);
+    if (m && m.length) { matches += m.length; segs += 1; }
+  }
+  out.textContent = matches ? t('fr.count', { n: matches, m: segs }) : t('fr.none');
+  $('#fr-go').disabled = matches === 0;
+}
+
+function openFrModal() {
+  if (!currentProject || isRunning) return;
+  $('#fr-find').value = $('#rv-search').value || '';
+  $('#fr-replace').value = '';
+  $('#fr-case').checked = false;
+  frUpdateCount();
+  $('#fr-modal').classList.add('open');
+  $('#fr-find').focus();
+}
+function closeFrModal() { $('#fr-modal').classList.remove('open'); }
+
+async function frReplaceAll() {
+  const re = frRegex();
+  if (!re || !currentProject) return;
+  const repl = $('#fr-replace').value;
+  let totalMatches = 0, changedSegs = 0;
+  for (const s of currentProject.segments) {
+    if (!s.translation) continue;
+    const m = s.translation.match(re);
+    if (!m || !m.length) continue;
+    s.translation = s.translation.replace(re, () => repl); // fn form: repl is literal
+    totalMatches += m.length;
+    changedSegs += 1;
+  }
+  if (changedSegs === 0) { closeFrModal(); return; }
+  $('#fr-go').disabled = true;
+  await window.api.saveProject(currentProject); // one atomic write of the whole project
+  closeFrModal();
+  toast(t('fr.done', { n: totalMatches, m: changedSegs }));
+  updateFilterCounts();
+  selectSegment(reviewIndex); // refresh editor + navigator snippets
+}
+
+$('#rv-fr').addEventListener('click', openFrModal);
+$('#fr-find').addEventListener('input', frUpdateCount);
+$('#fr-case').addEventListener('change', frUpdateCount);
+$('#fr-go').addEventListener('click', frReplaceAll);
+$('#fr-cancel').addEventListener('click', closeFrModal);
+$('#fr-modal').addEventListener('click', (e) => { if (e.target.id === 'fr-modal') closeFrModal(); });
+['#fr-find', '#fr-replace'].forEach((sel) => $(sel).addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !$('#fr-go').disabled) frReplaceAll();
+}));
+$('#rv-translation').addEventListener('input', () => { reviewDirty = true; });
+$('#rv-save').addEventListener('click', saveAndReview);
+$('#rv-prev').addEventListener('click', () => selectSegment(reviewIndex - 1));
+$('#rv-next').addEventListener('click', () => selectSegment(reviewIndex + 1));
+
+document.addEventListener('keydown', (e) => {
+  const inReview = $('#view-review').classList.contains('active');
+  if (!inReview || !currentProject) return;
+  // Ctrl/Cmd+S → save & mark reviewed
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    saveAndReview();
+  }
+  // Alt+Up / Alt+Down → move between segments
+  if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); selectSegment(reviewIndex - 1); }
+  if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); selectSegment(reviewIndex + 1); }
+});
+
+// ---- Retranslate ------------------------------------------------------------
+async function retranslateCurrent() {
+  if (!currentProject || isRunning) return;
+  const seg = currentProject.segments[reviewIndex];
+  if (seg.status === 'reviewed' && !confirm(t('confirm.retransReviewed'))) return;
+  if (reviewDirty) await persistCurrent(false);
+  setEngineRunning(true);
+  await window.api.retranslateSegment(currentProject.id, seg.id);
+}
+
+// "Retranslate all" opens a choice dialog so reviewed work is never redone by
+// accident — but you CAN force a full rerun when you want to.
+function openRetransModal() {
+  if (!currentProject || isRunning) return;
+  const c = countStatuses(currentProject.segments);
+  const unreviewed = c.total - c.reviewed;
+  $('#retrans-sub').textContent = t('rt.sub', { total: c.total, reviewed: c.reviewed, unreviewed });
+  const ub = $('#retrans-unreviewed');
+  ub.textContent = t('rt.unreviewed', { unreviewed });
+  ub.disabled = unreviewed === 0;
+  $('#retrans-all').textContent = c.reviewed > 0
+    ? t('rt.allOverwrite', { total: c.total, reviewed: c.reviewed })
+    : t('rt.all', { total: c.total });
+  $('#retrans-modal').classList.add('open');
+}
+function closeRetransModal() { $('#retrans-modal').classList.remove('open'); }
+
+async function doRetranslate(includeReviewed) {
+  closeRetransModal();
+  if (reviewDirty) await persistCurrent(false);
+  await window.api.resetForRetranslate(currentProject.id, includeReviewed);
+  currentProject = await window.api.getProject(currentProject.id);
+  renderNavWindow();
+  updateEditorHead();
+  setEngineRunning(true);
+  await window.api.startTranslation(currentProject.id);
+}
+
+// Approve every translated segment at once.
+async function markAllReviewed() {
+  if (!currentProject || isRunning) return;
+  const n = currentProject.segments.filter(
+    (s) => s.translation && s.translation.trim() && s.status !== 'reviewed'
+  ).length;
+  if (n === 0) { toast(t('toast.nothingMark')); return; }
+  if (!confirm(t('confirm.markAll', { n }))) return;
+  if (reviewDirty) await persistCurrent(false);
+  await window.api.markAllReviewed(currentProject.id);
+  currentProject = await window.api.getProject(currentProject.id);
+  renderNavWindow();
+  updateEditorHead();
+  toast(t('toast.allReviewed'));
+}
+
+$('#rv-retrans-seg').addEventListener('click', retranslateCurrent);
+$('#rv-retrans-all').addEventListener('click', () => {
+  if (isRunning) { window.api.stopTranslation(); return; }
+  openRetransModal();
+});
+$('#rv-review-all').addEventListener('click', markAllReviewed);
+$('#retrans-unreviewed').addEventListener('click', () => doRetranslate(false));
+$('#retrans-all').addEventListener('click', () => doRetranslate(true));
+$('#retrans-cancel').addEventListener('click', closeRetransModal);
+$('#retrans-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'retrans-modal') closeRetransModal();
+});
+
+// ---- Highlight-to-glossary --------------------------------------------------
+let glossPopSource = '';
+let glossPopPos = null; // remembered position once the user drags it somewhere
+
+function hideGlossPop() {
+  $('#gloss-pop').hidden = true;
+  glossPopSource = '';
+}
+
+function maybeShowGlossPop() {
+  if (!currentProject || !$('#view-review').classList.contains('active')) return;
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return;
+  const text = sel.toString().trim();
+  const original = $('#rv-original');
+  if (!text || text.length > 80 || !original.contains(sel.anchorNode)) return;
+
+  const pop = $('#gloss-pop');
+  $('#gloss-pop-src').textContent = text;
+  const tgt = $('#gloss-pop-tgt');
+  tgt.value = '';
+  tgt.dir = isRtlLang(currentProject.targetLang) ? 'rtl' : 'auto';
+  glossPopSource = text;
+
+  pop.hidden = false;
+  if (glossPopPos) {
+    // Reuse wherever the user last parked it.
+    pop.style.left = `${glossPopPos.left}px`;
+    pop.style.top = `${glossPopPos.top}px`;
+  } else {
+    // First time: open just below the selection, nudged right so it doesn't
+    // sit on top of the highlighted word.
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    const pw = 260;
+    const ph = pop.offsetHeight || 150;
+    let left = Math.min(rect.right + 12, window.innerWidth - pw - 12);
+    let top = rect.bottom + 8;
+    if (top + ph > window.innerHeight - 12) top = Math.max(12, rect.top - ph - 8);
+    pop.style.left = `${Math.max(12, left)}px`;
+    pop.style.top = `${Math.max(12, top)}px`;
+  }
+  tgt.focus();
+}
+
+// Drag the popup by its header; remember the position for next time.
+(function makeGlossPopDraggable() {
+  const pop = $('#gloss-pop');
+  const head = $('#gloss-pop-head');
+  let dragging = false, startX = 0, startY = 0, originX = 0, originY = 0;
+
+  head.addEventListener('mousedown', (e) => {
+    if (e.target.closest('.gp-close')) return;
+    dragging = true;
+    const r = pop.getBoundingClientRect();
+    startX = e.clientX; startY = e.clientY; originX = r.left; originY = r.top;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    let left = originX + (e.clientX - startX);
+    let top = originY + (e.clientY - startY);
+    left = Math.max(8, Math.min(left, window.innerWidth - pop.offsetWidth - 8));
+    top = Math.max(8, Math.min(top, window.innerHeight - pop.offsetHeight - 8));
+    pop.style.left = `${left}px`;
+    pop.style.top = `${top}px`;
+    glossPopPos = { left, top };
+  });
+  document.addEventListener('mouseup', () => { dragging = false; });
+})();
+
+async function addSelectionToGlossary(scope) {
+  const source = glossPopSource.trim();
+  const target = $('#gloss-pop-tgt').value.trim();
+  if (!source || !target) { $('#gloss-pop-tgt').focus(); return; }
+
+  if (scope === 'global') {
+    const g = await window.api.getGlobalGlossary();
+    g.push({ id: crypto.randomUUID(), source, target });
+    await window.api.saveGlobalGlossary(g);
+    globalGlossary = g;
+    toast(t('gloss.addedShared', { src: source }));
+  } else {
+    if (!Array.isArray(currentProject.glossary)) currentProject.glossary = [];
+    currentProject.glossary.push({ id: crypto.randomUUID(), source, target });
+    await window.api.saveGlossary(currentProject.id, currentProject.glossary);
+    toast(t('gloss.addedProject', { src: source }));
+  }
+  hideGlossPop();
+}
+
+$('#gloss-pop-shared').addEventListener('click', () => addSelectionToGlossary('global'));
+$('#gloss-pop-project').addEventListener('click', () => addSelectionToGlossary('project'));
+$('#gloss-pop-close').addEventListener('click', hideGlossPop);
+$('#gloss-pop-tgt').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') addSelectionToGlossary('global');
+  if (e.key === 'Escape') hideGlossPop();
+});
+$('#rv-original').addEventListener('mouseup', () => setTimeout(maybeShowGlossPop, 0));
+// Click well away from both the popup and the text dismisses it.
+document.addEventListener('mousedown', (e) => {
+  const pop = $('#gloss-pop');
+  if (!pop.hidden && !pop.contains(e.target) && !$('#rv-original').contains(e.target)) hideGlossPop();
+});
+
+// ============================================================================
+//  Glossary — Term Manager (shared dictionary + project-only terms)
+// ============================================================================
+let globalGlossary = [];
+
+// A "scope" bundles everything that differs between the two sections, so the
+// add/edit/delete/render logic can be written once.
+function scopeOf(name) {
+  if (name === 'global') {
+    return {
+      terms: () => globalGlossary,
+      setTerms: (t) => { globalGlossary = t; },
+      save: () => window.api.saveGlobalGlossary(globalGlossary),
+      listSel: '#gl-global-list',
+      srcSel: '#gl-global-source',
+      tgtSel: '#gl-global-target',
+      emptyKey: 'gloss.emptyShared',
+    };
+  }
+  return {
+    terms: () => currentProject.glossary,
+    setTerms: (t) => { currentProject.glossary = t; },
+    save: () => window.api.saveGlossary(currentProject.id, currentProject.glossary),
+    listSel: '#gl-project-list',
+    srcSel: '#gl-project-source',
+    tgtSel: '#gl-project-target',
+    emptyKey: 'gloss.emptyProject',
+  };
+}
+
+function rtlForTarget() {
+  // Use the open project's target language; fall back to auto-detection.
+  return currentProject && isRtlLang(currentProject.targetLang);
+}
+
+function renderTermList(name) {
+  const s = scopeOf(name);
+  const rtl = rtlForTarget();
+  $(s.tgtSel).dir = rtl ? 'rtl' : 'auto';
+  const list = $(s.listSel);
+  const terms = s.terms();
+
+  if (terms.length === 0) {
+    list.innerHTML = `<div class="glossary-empty-hint">${escapeHtml(t(s.emptyKey))}</div>`;
+    return;
+  }
+
+  list.innerHTML = '';
+  terms.forEach((term) => {
+    const row = document.createElement('div');
+    row.className = 'glossary-row';
+    row.innerHTML =
+      `<input class="js-src" type="text" value="${escapeHtml(term.source)}" />` +
+      `<span class="arrow">→</span>` +
+      `<input class="js-tgt" type="text" value="${escapeHtml(term.target)}" />` +
+      `<button class="js-del" title="Delete">✕</button>`;
+    row.querySelector('.js-tgt').dir = rtl ? 'rtl' : 'auto';
+    row.querySelector('.js-src').addEventListener('change', (e) => editTerm(name, term.id, 'source', e.target.value));
+    row.querySelector('.js-tgt').addEventListener('change', (e) => editTerm(name, term.id, 'target', e.target.value));
+    row.querySelector('.js-del').addEventListener('click', () => deleteTerm(name, term.id));
+    list.appendChild(row);
+  });
+}
+
+async function renderGlossary() {
+  // Shared dictionary is always available, even with no project open.
+  globalGlossary = await window.api.getGlobalGlossary();
+  renderTermList('global');
+
+  // Project-only section appears only when a project is open.
+  if (currentProject) {
+    if (!Array.isArray(currentProject.glossary)) currentProject.glossary = [];
+    $('#gl-project-area').hidden = false;
+    $('#gl-project-hint').hidden = true;
+    $('#gl-project-scope').textContent = t('gloss.scopeName', { name: currentProject.name });
+    renderTermList('project');
+  } else {
+    $('#gl-project-area').hidden = true;
+    $('#gl-project-hint').hidden = false;
+    $('#gl-project-scope').textContent = t('gloss.scopeNo');
+  }
+
+  if (currentProject && suggestProjectId !== currentProject.id) {
+    dismissedSuggestions = new Set(); // fresh dismissals per book
+    suggestProjectId = currentProject.id;
+  }
+  renderSuggestions();
+}
+
+// ---- Glossary auto-suggest: recurring proper nouns in the open book ----------
+let dismissedSuggestions = new Set();
+let suggestProjectId = null;
+
+// Common words that are capitalized at sentence starts but aren't names.
+const SUGGEST_STOP = new Set(
+  ('The A An And But Or Nor So Yet For Of To In On At By With From As If When While Then ' +
+   'There Here Now Yes No Not He She It They We You I His Her Hers Their My Your Our Its ' +
+   'This That These Those What Who Whom Whose Which Why How Where Was Were Is Are Be Been ' +
+   'Had Has Have Did Do Does Will Would Could Should May Might Must Can Oh Ah Well Once ' +
+   'Soon Still Just Even Only Perhaps Maybe Indeed Chapter Mr Mrs Ms Miss Dr St Sir Madam')
+    .split(/\s+/)
+);
+
+// Scan the source text for frequent capitalized terms not already in a glossary.
+function suggestTerms() {
+  if (!currentProject) return [];
+  const existing = new Set();
+  for (const g of (currentProject.glossary || [])) if (g.source) existing.add(g.source.toLowerCase());
+  for (const g of (globalGlossary || [])) if (g.source) existing.add(g.source.toLowerCase());
+
+  const counts = new Map();
+  const re = /[A-Z][a-zà-öø-ÿ'’\-]+(?:\s+[A-Z][a-zà-öø-ÿ'’\-]+)*/g;
+  for (const s of currentProject.segments) {
+    const text = s.original;
+    if (!text) continue;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      // Is this match at the start of a sentence (likely a false positive)?
+      let j = m.index - 1;
+      while (j >= 0 && /\s/.test(text[j])) j--;
+      const prev = j >= 0 ? text[j] : '';
+      const sentenceInitial = j < 0 || '.!?:;"“”—–('.includes(prev);
+
+      let words = m[0].split(/\s+/);
+      while (words.length && SUGGEST_STOP.has(words[0])) words.shift();      // drop leading "The", etc.
+      while (words.length && SUGGEST_STOP.has(words[words.length - 1])) words.pop();
+      if (!words.length) continue;
+      const cand = words.join(' ');
+      if (cand.length < 3) continue;
+
+      const rec = counts.get(cand) || { text: cand, count: 0, mid: 0 };
+      rec.count += 1;
+      if (!sentenceInitial) rec.mid += 1; // appears mid-sentence ⇒ confidently a name
+      counts.set(cand, rec);
+    }
+  }
+
+  const out = [];
+  for (const rec of counts.values()) {
+    if (existing.has(rec.text.toLowerCase())) continue;
+    if (dismissedSuggestions.has(rec.text.toLowerCase())) continue;
+    if (rec.mid >= 1 || rec.count >= 3) out.push(rec); // keep confident or frequent ones
+  }
+  out.sort((a, b) => b.count - a.count || a.text.localeCompare(b.text));
+  return out.slice(0, 25);
+}
+
+function renderSuggestions() {
+  const head = $('#gl-suggest-head');
+  const list = $('#gl-suggest-list');
+  const items = currentProject ? suggestTerms() : [];
+  if (items.length === 0) { head.hidden = true; list.hidden = true; list.innerHTML = ''; return; }
+
+  head.hidden = false; list.hidden = false;
+  const rtl = rtlForTarget();
+  list.innerHTML = '';
+  for (const it of items) {
+    const row = document.createElement('div');
+    row.className = 'suggest-row';
+    row.innerHTML =
+      `<span class="suggest-term">${escapeHtml(it.text)}</span>` +
+      `<span class="suggest-count">${it.count}×</span>` +
+      `<span class="arrow">→</span>` +
+      `<input class="js-stgt" type="text" placeholder="${escapeHtml(t('gloss.suggestTgtPh'))}" />` +
+      `<button class="btn btn-primary btn-sm js-add-book">${escapeHtml(t('gloss.addBook'))}</button>` +
+      `<button class="btn btn-ghost btn-sm js-add-shared">${escapeHtml(t('gloss.addShared'))}</button>` +
+      `<button class="js-dismiss" title="${escapeHtml(t('gloss.dismiss'))}">✕</button>`;
+    const tgt = row.querySelector('.js-stgt');
+    tgt.dir = rtl ? 'rtl' : 'auto';
+    row.querySelector('.js-add-book').addEventListener('click', () => addSuggestion('project', it.text, tgt.value));
+    row.querySelector('.js-add-shared').addEventListener('click', () => addSuggestion('global', it.text, tgt.value));
+    row.querySelector('.js-dismiss').addEventListener('click', () => {
+      dismissedSuggestions.add(it.text.toLowerCase());
+      renderSuggestions();
+    });
+    tgt.addEventListener('keydown', (e) => { if (e.key === 'Enter') addSuggestion('project', it.text, tgt.value); });
+    list.appendChild(row);
+  }
+}
+
+async function addSuggestion(scopeName, source, target) {
+  target = (target || '').trim();
+  if (!target) { toast(t('gloss.needTarget')); return; }
+  const s = scopeOf(scopeName);
+  if (scopeName === 'project' && !Array.isArray(currentProject.glossary)) currentProject.glossary = [];
+  s.terms().push({ id: crypto.randomUUID(), source, target });
+  await s.save();
+  renderTermList(scopeName);
+  renderSuggestions(); // the newly added term is now excluded
+  toast(t('gloss.added', { term: source }));
+}
+
+async function addTerm(name) {
+  const s = scopeOf(name);
+  const source = $(s.srcSel).value.trim();
+  const target = $(s.tgtSel).value.trim();
+  if (!source || !target) return;
+  s.terms().push({ id: crypto.randomUUID(), source, target });
+  await s.save();
+  $(s.srcSel).value = '';
+  $(s.tgtSel).value = '';
+  $(s.srcSel).focus();
+  renderTermList(name);
+}
+
+async function editTerm(name, id, field, value) {
+  const term = scopeOf(name).terms().find((t) => t.id === id);
+  if (!term) return;
+  term[field] = value.trim();
+  await scopeOf(name).save();
+}
+
+async function deleteTerm(name, id) {
+  const s = scopeOf(name);
+  s.setTerms(s.terms().filter((t) => t.id !== id));
+  await s.save();
+  renderTermList(name);
+}
+
+$('#gl-global-add').addEventListener('click', () => addTerm('global'));
+$('#gl-project-add').addEventListener('click', () => addTerm('project'));
+['#gl-global-source', '#gl-global-target'].forEach((sel) =>
+  $(sel).addEventListener('keydown', (e) => { if (e.key === 'Enter') addTerm('global'); }));
+['#gl-project-source', '#gl-project-target'].forEach((sel) =>
+  $(sel).addEventListener('keydown', (e) => { if (e.key === 'Enter') addTerm('project'); }));
+
+// ============================================================================
+//  Theme (dark default, light optional) — persisted
+// ============================================================================
+function currentTheme() { return document.documentElement.getAttribute('data-theme') || 'dark'; }
+function updateThemeLabel() {
+  const light = currentTheme() === 'light';
+  $('#theme-ic').textContent = light ? '☀️' : '🌙';
+  $('#theme-lbl').textContent = t(light ? 'theme.light' : 'theme.dark');
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('theme', theme);
+  updateThemeLabel();
+}
+$('#theme-toggle').addEventListener('click', () => {
+  applyTheme(currentTheme() === 'light' ? 'dark' : 'light');
+});
+
+// ============================================================================
+//  Language (English default, Arabic optional) — persisted, full RTL
+// ============================================================================
+function updateLangLabel() {
+  $('#lang-lbl').textContent = getLang() === 'en' ? 'العربية' : 'English';
+}
+$('#lang-toggle').addEventListener('click', () => {
+  setLang(getLang() === 'en' ? 'ar' : 'en');
+});
+
+// When the language flips, re-apply everything that's rendered dynamically.
+window.addEventListener('langchange', () => {
+  updateThemeLabel();
+  updateLangLabel();
+  renderLibrary(); // re-render cards in the new language
+  updatePrimaryAction();
+  if (currentProject) renderProgress(countStatuses(currentProject.segments));
+  if ($('#view-review').classList.contains('active')) renderReview();
+  if ($('#view-glossary').classList.contains('active')) renderGlossary();
+  if (isRunning) setEngineRunning(true); // fix dynamic button labels after applyI18n reset
+});
+
+// ---- Boot -------------------------------------------------------------------
+setLang(localStorage.getItem('lang') || 'en');   // applies static i18n + fires langchange → renderLibrary
+applyTheme(localStorage.getItem('theme') || 'dark');
+updateLangLabel();
+renderLibrary();

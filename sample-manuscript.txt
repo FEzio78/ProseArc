@@ -1,0 +1,13 @@
+The Shadow Blade
+
+The rain had not stopped for three days. Kael stood at the edge of the cliff, watching the grey sea churn beneath him, and wondered whether the storm was a warning or simply the world being indifferent as it always was.
+
+He had carried the Shadow Blade for a year now. It was lighter than any sword had a right to be, and colder, as if it remembered every winter it had ever passed through. The old woman in the market had called it cursed. Kael preferred to think of it as honest.
+
+This is a deliberately long paragraph written to test the sentence-splitting behaviour of the segmenter, because the brief asks that any paragraph too large for the local model be broken apart along sentence boundaries rather than sent as one enormous block. It keeps going past the point of comfort. It adds another sentence, and then another, each one a little unnecessary, padding the length so that the total character count climbs well above the configured limit. The point is not the prose but the punctuation: each full stop is a place where the segmenter is allowed to make a clean cut. By the time you reach the end of this paragraph, it should have been divided into two or more tidy segments, each ending on a sentence boundary, none of them sliced through the middle of a thought. That is the behaviour we want to confirm before moving on to translation.
+
+"You're late," she said, without turning around.
+
+Kael sheathed the blade. "The roads were watching."
+
+She finally looked at him then, and in her eyes he saw the same grey as the sea — patient, vast, and entirely unconcerned with whether he lived or died. "Then we should not keep them waiting any longer," she said, and walked into the rain.

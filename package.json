@@ -1,0 +1,55 @@
+{
+  "name": "prosearc",
+  "version": "0.1.0",
+  "description": "A human-in-the-loop translation workspace for novels, powered by a local AI model.",
+  "main": "main.js",
+  "author": "ProseArc",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FEzio78/ProseArc.git"
+  },
+  "keywords": [
+    "translation",
+    "novel",
+    "localization",
+    "electron",
+    "offline",
+    "llm",
+    "lm-studio",
+    "arabic",
+    "rtl",
+    "epub"
+  ],
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.prosearc.app",
+    "productName": "ProseArc",
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!*.vbs",
+      "!*.bat",
+      "!sample-manuscript.txt",
+      "!BUILD_BRIEF.md"
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "artifactName": "ProseArc.exe"
+    }
+  },
+  "devDependencies": {
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "mammoth": "^1.12.0",
+    "node-html-parser": "^8.0.1"
+  }
+}

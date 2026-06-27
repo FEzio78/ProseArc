@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ProseArc</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Slim left sidebar: Library / Workspace / Review / Glossary -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">ProseArc</div>
+      <div class="sub" data-i18n="brand.sub">The translator's desk</div>
+    </div>
+
+    <button class="nav-item active" data-view="library"><span class="dot"></span><span data-i18n="nav.library">Library</span></button>
+    <button class="nav-item" data-view="workspace"><span class="dot"></span><span data-i18n="nav.workspace">Workspace</span></button>
+    <button class="nav-item" data-view="review"><span class="dot"></span><span data-i18n="nav.review">Review</span></button>
+    <button class="nav-item" data-view="glossary"><span class="dot"></span><span data-i18n="nav.glossary">Glossary</span></button>
+
+    <div class="nav-spacer"></div>
+
+    <button class="theme-toggle" id="lang-toggle" title="Language">
+      <span class="ic">🌐</span>
+      <span id="lang-lbl">العربية</span>
+    </button>
+    <button class="theme-toggle" id="theme-toggle" title="Switch light / dark">
+      <span class="ic" id="theme-ic">🌙</span>
+      <span id="theme-lbl">Dark</span>
+    </button>
+  </aside>
+
+  <main class="main">
+    <!-- LIBRARY ------------------------------------------------------------ -->
+    <section class="view active" id="view-library">
+      <div class="view-head">
+        <div>
+          <h1 data-i18n="lib.title">Library</h1>
+          <p class="lede" data-i18n="lib.lede">Your translation projects.</p>
+        </div>
+        <button class="btn btn-primary" id="new-project-btn" data-i18n="lib.new">New Project</button>
+      </div>
+      <div id="library-body"><!-- cards or empty state injected here --></div>
+    </section>
+
+    <!-- WORKSPACE — Control Center ----------------------------------------- -->
+    <section class="view" id="view-workspace">
+      <!-- Shown when no project is open -->
+      <div id="workspace-empty">
+        <div class="view-head"><div><h1 data-i18n="ws.title">Workspace</h1>
+          <p class="lede" data-i18n="ws.lede">Control center for translating the current project.</p></div></div>
+        <div class="placeholder" data-i18n="ws.empty">Open a project from the Library to see it here.</div>
+      </div>
+
+      <!-- Shown when a project is open -->
+      <div id="workspace-panel" hidden>
+        <div class="view-head">
+          <div>
+            <h1 id="ws-title">Project</h1>
+            <p class="lede" id="ws-langs"></p>
+          </div>
+          <div class="head-actions">
+            <button class="btn btn-ghost" id="ws-export">Export…</button>
+            <button class="btn btn-primary" id="ws-run" data-i18n="ws.start">Start translating</button>
+          </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress" style="margin-bottom:24px">
+          <div class="progress-track"><div class="progress-fill" id="ws-bar" style="width:0%"></div></div>
+          <div class="progress-meta" id="ws-counter"></div>
+        </div>
+
+        <div class="ws-grid">
+          <!-- Settings -->
+          <div class="panel">
+            <h3 class="panel-title" data-i18n="settings.title">Settings</h3>
+            <div class="field">
+              <label for="ws-name" data-i18n="f.name">Project name</label>
+              <input id="ws-name" type="text" />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="ws-source" data-i18n="f.source">Source language</label>
+                <input id="ws-source" type="text" />
+              </div>
+              <div class="field">
+                <label for="ws-target" data-i18n="f.target">Target language</label>
+                <input id="ws-target" type="text" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="ws-url" data-i18n="f.url">Local API URL</label>
+              <input id="ws-url" type="text" />
+              <div class="test-row">
+                <button class="btn btn-ghost btn-sm" id="ws-test" data-i18n="ws.test">Test connection</button>
+                <span class="test-result" id="ws-test-result"></span>
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="ws-model"><span data-i18n="f.model">Model name</span>
+                  <span class="hint" data-i18n="f.modelOpt">(optional)</span></label>
+                <input id="ws-model" type="text" data-i18n-ph="f.modelPh" placeholder="leave blank for loaded model" />
+              </div>
+              <div class="field" style="max-width:140px">
+                <label for="ws-context" data-i18n="f.context">Context window</label>
+                <input id="ws-context" type="number" min="0" max="10" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="ws-style"><span data-i18n="f.style">Translation style</span>
+                <span class="hint" data-i18n="f.styleOpt">(optional)</span></label>
+              <textarea id="ws-style" rows="3" data-i18n-ph="f.stylePh"
+                placeholder="e.g. Formal classical Arabic; keep an intimate, lyrical tone; address the reader formally."></textarea>
+              <p class="settings-note" data-i18n="f.styleHint">A short brief sent with every segment — tone, formality, audience.</p>
+            </div>
+            <p class="settings-note" data-i18n="settings.note">Changes save automatically.</p>
+          </div>
+
+          <!-- Live activity log -->
+          <div class="panel">
+            <h3 class="panel-title" data-i18n="activity.title">Activity</h3>
+            <div class="log" id="ws-log">
+              <div class="log-line muted" data-i18n="activity.ready">Ready. Press “Start translating” when LM Studio is running.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- REVIEW — Split-Screen Editor --------------------------------------- -->
+    <section class="view view-review" id="view-review">
+      <div id="review-empty">
+        <div class="view-head"><div><h1 data-i18n="nav.review">Review</h1>
+          <p class="lede" data-i18n="review.lede">Side-by-side editing.</p></div></div>
+        <div class="placeholder" data-i18n="review.empty">Open a project from the Library to start reviewing.</div>
+      </div>
+
+      <div id="review-panel" hidden>
+        <div class="review-layout">
+          <!-- Navigator (virtualized) -->
+          <div class="navigator">
+            <div class="nav-head">
+              <span id="rv-nav-title">Segments</span>
+            </div>
+            <div class="nav-filters" id="rv-filters">
+              <button class="nav-filter active" data-status="all"><span data-i18n="rv.fAll">All</span> <span class="fcount" id="fc-all"></span></button>
+              <button class="nav-filter" data-status="pending"><span class="dot status-pending"></span> <span class="fcount" id="fc-pending"></span></button>
+              <button class="nav-filter" data-status="translated"><span class="dot status-translated"></span> <span class="fcount" id="fc-translated"></span></button>
+              <button class="nav-filter" data-status="reviewed"><span class="dot status-reviewed"></span> <span class="fcount" id="fc-reviewed"></span></button>
+            </div>
+            <div class="nav-scroll" id="rv-nav-scroll">
+              <div class="nav-spacer" id="rv-nav-spacer"></div>
+            </div>
+          </div>
+
+          <!-- Editor -->
+          <div class="editor">
+            <div class="ed-head">
+              <div>
+                <span id="rv-position" class="ed-position"></span>
+                <span id="rv-status" class="ed-status"></span>
+              </div>
+              <input class="ed-search" id="rv-search" type="text" data-i18n-ph="rv.search" placeholder="Search…" />
+              <div class="ed-actions">
+                <span id="rv-saved" class="ed-saved"></span>
+                <button class="btn btn-ghost btn-sm" id="rv-fr" data-i18n="fr.open">⇄ Replace</button>
+                <button class="btn btn-ghost btn-sm" id="rv-retrans-all" data-i18n="rv.all">↻ All</button>
+                <button class="btn btn-ghost btn-sm" id="rv-retrans-seg" data-i18n="rv.segment">↻ Segment</button>
+                <span class="ed-divider"></span>
+                <button class="btn btn-ghost btn-sm" id="rv-prev" data-i18n="rv.prev">↑ Prev</button>
+                <button class="btn btn-ghost btn-sm" id="rv-next" data-i18n="rv.next">Next ↓</button>
+                <button class="btn btn-ghost btn-sm" id="rv-review-all" data-i18n="rv.reviewAll">✓ All reviewed</button>
+                <button class="btn btn-primary btn-sm" id="rv-save" data-i18n="rv.save">Save &amp; mark reviewed</button>
+              </div>
+            </div>
+
+            <div class="ed-panes">
+              <div class="pane">
+                <div class="pane-label" id="rv-source-label">Original</div>
+                <div class="pane-body manuscript" id="rv-original"></div>
+              </div>
+              <div class="pane">
+                <div class="pane-label" id="rv-target-label">Translation</div>
+                <textarea class="pane-body manuscript" id="rv-translation"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GLOSSARY — Term Manager -------------------------------------------- -->
+    <section class="view" id="view-glossary">
+      <div class="view-head">
+        <div>
+          <h1 data-i18n="gloss.title">Glossary</h1>
+          <p class="lede" data-i18n="gloss.lede">Terms are injected only into segments where they appear. Project terms override shared ones.</p>
+        </div>
+      </div>
+
+      <!-- Shared dictionary — available even with no project open -->
+      <h3 class="gl-section-title"><span data-i18n="gloss.shared">Shared dictionary</span>
+        <span class="gl-scope" data-i18n="gloss.scopeAll">· all projects</span></h3>
+      <div class="glossary-add">
+        <input id="gl-global-source" type="text" data-i18n-ph="gloss.srcPh" placeholder="Source term" />
+        <span class="arrow">→</span>
+        <input id="gl-global-target" type="text" data-i18n-ph="gloss.tgtPh" placeholder="Target term" />
+        <button class="btn btn-primary" id="gl-global-add" data-i18n="gloss.add">Add pair</button>
+      </div>
+      <div id="gl-global-list"></div>
+
+      <!-- Project-specific terms -->
+      <h3 class="gl-section-title" style="margin-top:34px"><span data-i18n="gloss.project">This project only</span>
+        <span class="gl-scope" id="gl-project-scope" data-i18n="gloss.scopeNo">· no project open</span></h3>
+      <div id="gl-project-area" hidden>
+        <div class="glossary-add">
+          <input id="gl-project-source" type="text" data-i18n-ph="gloss.srcPh2" placeholder="Source term" />
+          <span class="arrow">→</span>
+          <input id="gl-project-target" type="text" data-i18n-ph="gloss.tgtPh2" placeholder="Target term" />
+          <button class="btn btn-ghost" id="gl-project-add" data-i18n="gloss.add">Add pair</button>
+        </div>
+        <div id="gl-project-list"></div>
+      </div>
+      <div id="gl-project-hint" class="glossary-empty-hint" data-i18n="gloss.projectHint">
+        Open a project from the Library to add terms that apply only to it.
+      </div>
+
+      <!-- Auto-suggested names/terms detected in the open book -->
+      <h3 class="gl-section-title" id="gl-suggest-head" style="margin-top:34px" hidden>
+        <span data-i18n="gloss.suggested">Suggested names</span>
+        <span class="gl-scope" data-i18n="gloss.suggestedHint">· recurring terms found in this book</span>
+      </h3>
+      <div id="gl-suggest-list" hidden></div>
+    </section>
+  </main>
+
+  <!-- New Project modal ---------------------------------------------------- -->
+  <div class="modal-backdrop" id="new-project-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="np-title">
+      <h2 id="np-title" data-i18n="np.title">New Project</h2>
+      <p class="modal-sub" data-i18n="np.sub">Import a manuscript and set up its translation.</p>
+
+      <div class="field">
+        <label data-i18n="np.file">Manuscript file</label>
+        <div class="file-chip" id="np-file">
+          <span id="np-file-label">No file chosen</span>
+          <button class="btn btn-ghost btn-sm" id="np-pick-btn" style="margin-inline-start:auto" data-i18n="np.choose">Choose…</button>
+        </div>
+        <p class="settings-note" data-i18n="np.fileHint">TXT, Markdown, EPUB, or Word (.docx). Structure is preserved.</p>
+      </div>
+
+      <div class="field">
+        <label for="np-name" data-i18n="np.name">Project name</label>
+        <input id="np-name" type="text" data-i18n-ph="np.namePh" placeholder="e.g. The Shadow Blade" />
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="np-source" data-i18n="f.source">Source language</label>
+          <input id="np-source" type="text" value="English" />
+        </div>
+        <div class="field">
+          <label for="np-target" data-i18n="f.target">Target language</label>
+          <input id="np-target" type="text" value="Arabic" />
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="np-cancel" data-i18n="np.cancel">Cancel</button>
+        <button class="btn btn-primary" id="np-create" disabled data-i18n="np.create">Create Project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export modal — choose format in-app -->
+  <div class="modal-backdrop" id="export-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="export-title">
+      <h2 id="export-title" data-i18n="ex.title">Export</h2>
+      <p class="modal-sub" id="export-sub" data-i18n="ex.sub">Choose a format.</p>
+
+      <div class="format-grid" id="export-formats">
+        <button class="format-opt" data-fmt="txt">
+          <span class="fmt-name">TXT</span><span class="fmt-desc" data-i18n="ex.txtDesc">Plain text</span></button>
+        <button class="format-opt" data-fmt="md">
+          <span class="fmt-name">Markdown</span><span class="fmt-desc" data-i18n="ex.mdDesc">.md plain text</span></button>
+        <button class="format-opt" data-fmt="pdf">
+          <span class="fmt-name">PDF</span><span class="fmt-desc" data-i18n="ex.pdfDesc">Print-ready book</span></button>
+        <button class="format-opt" data-fmt="epub">
+          <span class="fmt-name">EPUB</span><span class="fmt-desc" data-i18n="ex.epubDesc">For e-readers</span></button>
+      </div>
+
+      <div class="export-status" id="export-status"></div>
+
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="export-cancel" data-i18n="ex.cancel">Cancel</button>
+        <button class="btn btn-primary" id="export-go">Export</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Retranslate choice modal -->
+  <div class="modal-backdrop" id="retrans-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="retrans-title">
+      <h2 id="retrans-title" data-i18n="rt.title">Retranslate segments</h2>
+      <p class="modal-sub" id="retrans-sub" data-i18n="rt.subDefault">Choose what to re-run through the AI.</p>
+      <div class="modal-actions" style="flex-direction:column; align-items:stretch; gap:10px">
+        <button class="btn btn-primary" id="retrans-unreviewed">Re-do unreviewed only</button>
+        <button class="btn btn-danger" id="retrans-all">Re-do everything</button>
+        <button class="btn btn-ghost" id="retrans-cancel" data-i18n="rt.cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Find & replace across translations -->
+  <div class="modal-backdrop" id="fr-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fr-title">
+      <h2 id="fr-title" data-i18n="fr.title">Find &amp; replace</h2>
+      <p class="modal-sub" data-i18n="fr.sub">Replace text across every translation in this project.</p>
+      <div class="field">
+        <label for="fr-find" data-i18n="fr.find">Find</label>
+        <input id="fr-find" type="text" />
+      </div>
+      <div class="field">
+        <label for="fr-replace" data-i18n="fr.replace">Replace with</label>
+        <input id="fr-replace" type="text" />
+      </div>
+      <label class="fr-check"><input type="checkbox" id="fr-case" /> <span data-i18n="fr.case">Match case</span></label>
+      <div class="fr-count" id="fr-count"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="fr-cancel" data-i18n="np.cancel">Cancel</button>
+        <button class="btn btn-primary" id="fr-go" disabled data-i18n="fr.go">Replace all</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Highlight-to-glossary popup (appears when you select text in the original) -->
+  <div class="gloss-pop" id="gloss-pop" hidden>
+    <div class="gloss-pop-head" id="gloss-pop-head">
+      <span data-i18n="gloss.popHead">⋮⋮ Add to glossary</span>
+      <button class="gp-close" id="gloss-pop-close" title="Close">✕</button>
+    </div>
+    <div class="gloss-pop-src" id="gloss-pop-src"></div>
+    <input id="gloss-pop-tgt" type="text" data-i18n-ph="gloss.popTgtPh" placeholder="Its translation…" />
+    <div class="gloss-pop-actions">
+      <button class="btn btn-primary btn-sm" id="gloss-pop-shared" data-i18n="gloss.popShared">Add to shared</button>
+      <button class="btn btn-ghost btn-sm" id="gloss-pop-project" data-i18n="gloss.popProject">This project</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="i18n.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
