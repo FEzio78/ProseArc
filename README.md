@@ -2,7 +2,7 @@
   <img src="assets/logo.png" alt="ProseArc" width="420" />
 </p>
 
-A **calm, offline, human‑in‑the‑loop workspace for translating novels** with a local AI model. Import a manuscript, let a local model produce a first‑pass translation, then review it side‑by‑side and polish it — keeping full control over quality, consistency, and tone.
+A **human‑in‑the‑loop workspace for translating novels** with a local AI model. Import a manuscript, let a local model produce a first‑pass translation, then review it side‑by‑side and polish it — keeping full control over quality, consistency, and tone.
 
 > **Privacy first.** Every AI call goes to a *local* OpenAI‑compatible server (LM Studio by default). Nothing leaves your machine.
 
