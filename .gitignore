@@ -1,9 +1,8 @@
 # Dependencies
 node_modules/
 
-# Build output
+# Build output (build/ holds icon resources and IS committed)
 dist/
-build/
 
 # Logs & OS cruft
 *.log
