@@ -29,6 +29,7 @@ function showView(name) {
   if (name === 'glossary') renderGlossary();
   if (name === 'settings') renderSettings();
   if (name === 'reader') renderReader();
+  if (name === 'hub') renderHub();
 }
 
 $$('.nav-item').forEach((btn) => {
@@ -58,13 +59,13 @@ async function renderLibrary() {
     const id = card.dataset.id;
     card.addEventListener('click', (e) => {
       if (e.target.closest('.card-actions')) return; // let action buttons handle themselves
-      openProject(id);
+      openBook(id);
     });
     // Keyboard: Enter/Space opens the focused card.
     card.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openProject(id); }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openBook(id); }
     });
-    card.querySelector('.js-open').addEventListener('click', () => openProject(id));
+    card.querySelector('.js-open').addEventListener('click', () => openBook(id));
     card.querySelector('.js-delete').addEventListener('click', () => deleteProject(id, card));
   });
 }
@@ -120,7 +121,8 @@ function renderProgress(counts) {
     t('stats', { t: counts.translated, n: counts.total, r: counts.reviewed });
 }
 
-async function openProject(id) {
+// Load a project into memory and populate the workspace fields (no navigation).
+async function loadProject(id) {
   const project = await window.api.getProject(id);
   currentProject = project;
   currentProjectId = id;
@@ -143,8 +145,69 @@ async function openProject(id) {
 
   $('#workspace-empty').hidden = true;
   $('#workspace-panel').hidden = false;
+}
+
+// Clicking a book in the Library lands on its hub page.
+async function openBook(id) {
+  await loadProject(id);
+  renderHub();
+  showView('hub');
+}
+// Open straight into the Workspace (used by the hub's Translate action).
+async function openProject(id) {
+  if (!currentProject || currentProject.id !== id) await loadProject(id);
   showView('workspace');
 }
+
+// ---- Book hub ---------------------------------------------------------------
+const HUB_COLORS = ['#3a5750', '#5a4040', '#3f4a5e', '#574a63', '#5e5333', '#42565e'];
+function coverColor(name) {
+  let h = 0;
+  const s = String(name || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return HUB_COLORS[h % HUB_COLORS.length];
+}
+function renderHub() {
+  if (!currentProject) return;
+  const p = currentProject;
+  const c = countStatuses(p.segments);
+  const pct = c.total ? Math.round((c.translated / c.total) * 100) : 0;
+  $('#hub-title').textContent = p.name;
+  $('#hub-langs').textContent = `${p.sourceLang} → ${p.targetLang}`;
+  $('#hub-cover').style.background = coverColor(p.name);
+  $('#hub-initial').textContent = (p.name || '?').trim()[0] || '?';
+  $('#hub-bar-fill').style.width = `${pct}%`;
+  $('#hub-counts').textContent = t('stats', { t: c.translated, n: c.total, r: c.reviewed });
+}
+async function renameCurrentBook() {
+  if (!currentProject) return;
+  const name = prompt(t('hub.renamePrompt'), currentProject.name);
+  if (name == null) return;
+  const clean = name.trim();
+  if (!clean) return;
+  currentProject.name = clean;
+  $('#ws-name').value = clean;
+  $('#ws-title').textContent = clean;
+  await window.api.saveProject(currentProject);
+  renderHub();
+}
+async function deleteCurrentBook() {
+  if (!currentProject) return;
+  if (!confirm(t('confirm.delete', { name: currentProject.name }))) return;
+  await window.api.deleteProject(currentProject.id);
+  currentProject = null;
+  currentProjectId = null;
+  toast(t('toast.deleted'));
+  showView('library');
+  renderLibrary();
+}
+$('#hub-read').addEventListener('click', () => showView('reader'));
+$('#hub-translate').addEventListener('click', () => showView('workspace'));
+$('#hub-review').addEventListener('click', () => showView('review'));
+$('#hub-export').addEventListener('click', () => openExportModal());
+$('#hub-back').addEventListener('click', () => { showView('library'); renderLibrary(); });
+$('#hub-rename').addEventListener('click', renameCurrentBook);
+$('#hub-delete').addEventListener('click', deleteCurrentBook);
 
 // Auto-save settings whenever a field changes.
 async function saveSettings() {
@@ -403,6 +466,7 @@ async function createProject() {
   closeNewProjectModal();
   toast(t('toast.created', { name: project.name, n: project.segments.length }));
   await renderLibrary();
+  openBook(project.id); // land on the new book's hub
 }
 
 // Modal wiring
@@ -1189,6 +1253,7 @@ window.addEventListener('langchange', () => {
   if ($('#view-review').classList.contains('active')) renderReview();
   if ($('#view-glossary').classList.contains('active')) renderGlossary();
   if ($('#view-settings').classList.contains('active')) renderSettings();
+  if ($('#view-hub').classList.contains('active')) renderHub();
   if (isRunning) setEngineRunning(true); // fix dynamic button labels after applyI18n reset
 });
 

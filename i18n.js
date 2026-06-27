@@ -26,6 +26,8 @@ const I18N = {
     'set.appearanceNote': 'Appearance is saved on this device.',
 
     'lib.title': 'Library', 'lib.lede': 'Your translation projects.', 'lib.new': 'New Project',
+    'hub.back': 'Library', 'hub.read': 'Read', 'hub.translate': 'Translate', 'hub.review': 'Review',
+    'hub.export': 'Export…', 'hub.rename': 'Rename', 'hub.renamePrompt': 'Rename this book:',
     'lib.emptyTitle': 'Your desk is clear.',
     'lib.emptyBody': 'Import a manuscript to begin your first translation project.',
     'lib.emptyBtn': 'Start a project',
@@ -170,6 +172,8 @@ const I18N = {
     'set.appearanceNote': 'يُحفَظ المظهر على هذا الجهاز.',
 
     'lib.title': 'المكتبة', 'lib.lede': 'مشاريع الترجمة الخاصة بك.', 'lib.new': 'مشروع جديد',
+    'hub.back': 'المكتبة', 'hub.read': 'قراءة', 'hub.translate': 'ترجمة', 'hub.review': 'مراجعة',
+    'hub.export': 'تصدير…', 'hub.rename': 'إعادة تسمية', 'hub.renamePrompt': 'إعادة تسمية هذا الكتاب:',
     'lib.emptyTitle': 'مكتبك خالٍ.',
     'lib.emptyBody': 'استورد مخطوطة لبدء أول مشروع ترجمة لك.',
     'lib.emptyBtn': 'ابدأ مشروعًا',

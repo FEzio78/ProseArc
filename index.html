@@ -48,6 +48,32 @@
       <div id="library-body"><!-- cards or empty state injected here --></div>
     </section>
 
+    <!-- BOOK HUB — a page per book ----------------------------------------- -->
+    <section class="view" id="view-hub">
+      <button class="hub-back" id="hub-back"><span>‹</span> <span data-i18n="hub.back">Library</span></button>
+      <div class="hub-card">
+        <div class="hub-cover" id="hub-cover"><span id="hub-initial">?</span></div>
+        <div class="hub-info">
+          <h1 id="hub-title">Book</h1>
+          <div class="hub-langs" id="hub-langs"></div>
+          <div class="progress hub-progress">
+            <div class="progress-track"><div class="progress-fill" id="hub-bar-fill" style="width:0%"></div></div>
+            <div class="progress-meta" id="hub-counts"></div>
+          </div>
+          <div class="hub-actions">
+            <button class="btn btn-primary" id="hub-read" data-i18n="hub.read">Read</button>
+            <button class="btn btn-ghost" id="hub-translate" data-i18n="hub.translate">Translate</button>
+            <button class="btn btn-ghost" id="hub-review" data-i18n="hub.review">Review</button>
+            <button class="btn btn-ghost" id="hub-export" data-i18n="hub.export">Export…</button>
+          </div>
+          <div class="hub-meta-actions">
+            <button class="btn btn-ghost btn-sm" id="hub-rename" data-i18n="hub.rename">Rename</button>
+            <button class="btn btn-danger btn-sm" id="hub-delete" data-i18n="card.delete">Delete</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- WORKSPACE — Control Center ----------------------------------------- -->
     <section class="view" id="view-workspace">
       <!-- Shown when no project is open -->
