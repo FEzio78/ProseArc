@@ -50,7 +50,7 @@ Produces a portable `.exe` in `dist/` (Windows) — no Node required to run it.
 
 ## Where data lives
 
-Projects are stored as JSON in your OS app‑data folder (`%APPDATA%/prosearc/` on Windows), written atomically so a crash never corrupts a project. The shared glossary lives beside them. (Projects from the app's earlier name are migrated automatically on first launch.)
+Each project is a single JSON file under your OS per‑app data folder — `%APPDATA%\prosearc\projects\` on Windows (i.e. `C:\Users\<you>\AppData\Roaming\prosearc\projects\`). Saves are atomic (written to a temp file, then renamed into place), so an interrupted save never leaves a half‑written, corrupt project. The shared glossary sits alongside that folder at `%APPDATA%\prosearc\glossary-global.json`.
 
 ## License
 
