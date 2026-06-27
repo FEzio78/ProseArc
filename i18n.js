@@ -7,8 +7,13 @@
 const I18N = {
   en: {
     'brand.sub': "The translator's desk",
-    'nav.library': 'Library', 'nav.workspace': 'Workspace', 'nav.review': 'Review', 'nav.glossary': 'Glossary',
+    'nav.library': 'Library', 'nav.workspace': 'Workspace', 'nav.review': 'Review', 'nav.glossary': 'Glossary', 'nav.settings': 'Settings',
     'theme.dark': 'Dark', 'theme.light': 'Light',
+    'set.title': 'Settings', 'set.lede': 'Defaults applied to new projects, and app appearance.',
+    'set.defaults': 'Defaults for new projects',
+    'set.note': 'These apply to new projects only. Each project keeps its own settings, editable in its Workspace.',
+    'set.appearance': 'Appearance', 'set.theme': 'Theme', 'set.language': 'Interface language',
+    'set.appearanceNote': 'Appearance is saved on this device.',
 
     'lib.title': 'Library', 'lib.lede': 'Your translation projects.', 'lib.new': 'New Project',
     'lib.emptyTitle': 'Your desk is clear.',
@@ -136,8 +141,13 @@ const I18N = {
 
   ar: {
     'brand.sub': 'مكتب المترجم',
-    'nav.library': 'المكتبة', 'nav.workspace': 'مساحة العمل', 'nav.review': 'المراجعة', 'nav.glossary': 'المسرد',
+    'nav.library': 'المكتبة', 'nav.workspace': 'مساحة العمل', 'nav.review': 'المراجعة', 'nav.glossary': 'المسرد', 'nav.settings': 'الإعدادات',
     'theme.dark': 'داكن', 'theme.light': 'فاتح',
+    'set.title': 'الإعدادات', 'set.lede': 'إعدادات افتراضية تُطبَّق على المشاريع الجديدة، ومظهر التطبيق.',
+    'set.defaults': 'الإعدادات الافتراضية للمشاريع الجديدة',
+    'set.note': 'تنطبق على المشاريع الجديدة فقط. يحتفظ كل مشروع بإعداداته الخاصة، القابلة للتعديل في مساحة عمله.',
+    'set.appearance': 'المظهر', 'set.theme': 'السمة', 'set.language': 'لغة الواجهة',
+    'set.appearanceNote': 'يُحفَظ المظهر على هذا الجهاز.',
 
     'lib.title': 'المكتبة', 'lib.lede': 'مشاريع الترجمة الخاصة بك.', 'lib.new': 'مشروع جديد',
     'lib.emptyTitle': 'مكتبك خالٍ.',

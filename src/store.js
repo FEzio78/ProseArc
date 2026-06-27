@@ -32,6 +32,12 @@ function createStore(projectsDir) {
   // The shared dictionary lives beside the projects folder (one per install).
   const globalGlossaryPath = path.join(path.dirname(projectsDir), 'glossary-global.json');
 
+  // App-wide defaults for NEW projects (set once in the Settings tab).
+  const settingsPath = path.join(path.dirname(projectsDir), 'settings-global.json');
+
+  // Only these keys are stored as project defaults; anything else is ignored.
+  const SETTINGS_KEYS = ['sourceLang', 'targetLang', 'apiUrl', 'model', 'contextWindow'];
+
   /** Atomically write an object as pretty JSON to `dest`. */
   async function atomicWrite(dest, obj) {
     // Unique temp name so two concurrent saves can't collide on the temp file.
@@ -113,6 +119,7 @@ function createStore(projectsDir) {
   async function createProject({ name, text, blocks, settings = {} }) {
     const now = new Date().toISOString();
     const rawSegments = Array.isArray(blocks) ? segmentBlocks(blocks) : segment(text || '');
+    const globalDefaults = await getSettings(); // user's saved defaults seed new projects
 
     const project = {
       schemaVersion: SCHEMA_VERSION,
@@ -120,6 +127,7 @@ function createStore(projectsDir) {
       kind: 'novel',
       name: name && name.trim() ? name.trim() : 'Untitled Project',
       ...DEFAULTS,
+      ...globalDefaults,
       ...settings,
       createdAt: now,
       updatedAt: now,
@@ -221,6 +229,26 @@ function createStore(projectsDir) {
     return list;
   }
 
+  /** App-wide default settings for new projects. Returns {} if none saved. */
+  async function getSettings() {
+    try {
+      const raw = JSON.parse(await fsp.readFile(settingsPath, 'utf8'));
+      const clean = {};
+      for (const k of SETTINGS_KEYS) if (raw[k] !== undefined) clean[k] = raw[k];
+      return clean;
+    } catch {
+      return {};
+    }
+  }
+
+  /** Atomically save app-wide default settings (only known keys are kept). */
+  async function saveSettings(input) {
+    const clean = {};
+    for (const k of SETTINGS_KEYS) if (input && input[k] !== undefined) clean[k] = input[k];
+    await atomicWrite(settingsPath, clean);
+    return clean;
+  }
+
   /** Delete a project file. Resolves even if it was already gone. */
   async function deleteProject(id) {
     try {
@@ -241,6 +269,8 @@ function createStore(projectsDir) {
     markAllReviewed,
     getGlobalGlossary,
     saveGlobalGlossary,
+    getSettings,
+    saveSettings,
     deleteProject,
     countStatuses,
     _atomicWrite: atomicWrite, // exposed for engine use later

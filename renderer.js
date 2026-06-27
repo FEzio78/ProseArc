@@ -27,6 +27,7 @@ function showView(name) {
   $$('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${name}`));
   if (name === 'review') renderReview();
   if (name === 'glossary') renderGlossary();
+  if (name === 'settings') renderSettings();
 }
 
 $$('.nav-item').forEach((btn) => {
@@ -222,16 +223,14 @@ async function toggleRun() {
 $('#ws-run').addEventListener('click', toggleRun);
 
 // ---- Test connection --------------------------------------------------------
-async function testConnection() {
-  const out = $('#ws-test-result');
-  const url = $('#ws-url').value.trim();
+async function runConnectionTest(url, out) {
   out.className = 'test-result busy';
   out.textContent = t('test.testing');
-  const r = await window.api.testConnection(url);
+  const r = await window.api.testConnection((url || '').trim());
   out.className = 'test-result ' + (r.ok ? 'ok' : 'bad');
   out.textContent = (r.ok ? '✓ ' : '✕ ') + t('test.' + r.code, r.params);
 }
-$('#ws-test').addEventListener('click', testConnection);
+$('#ws-test').addEventListener('click', () => runConnectionTest($('#ws-url').value, $('#ws-test-result')));
 
 // ---- Export -----------------------------------------------------------------
 let exportFormat = localStorage.getItem('exportFormat') || 'pdf';
@@ -341,13 +340,15 @@ function applyLiveSegment(ev) {
 // ---- New Project modal ------------------------------------------------------
 let pickedManuscript = null; // { fileName, text }
 
-function openNewProjectModal() {
+async function openNewProjectModal() {
   pickedManuscript = null;
   $('#np-file-label').textContent = t('np.noFile');
   $('#np-file').classList.remove('chosen');
   $('#np-name').value = '';
-  $('#np-source').value = 'English';
-  $('#np-target').value = 'Arabic';
+  // Pre-fill languages from the saved global defaults (Settings).
+  const s = await window.api.getSettings();
+  $('#np-source').value = s.sourceLang || 'English';
+  $('#np-target').value = s.targetLang || 'Arabic';
   $('#np-create').disabled = true;
   $('#new-project-modal').classList.add('open');
 }
@@ -1185,8 +1186,43 @@ window.addEventListener('langchange', () => {
   if (currentProject) renderProgress(countStatuses(currentProject.segments));
   if ($('#view-review').classList.contains('active')) renderReview();
   if ($('#view-glossary').classList.contains('active')) renderGlossary();
+  if ($('#view-settings').classList.contains('active')) renderSettings();
   if (isRunning) setEngineRunning(true); // fix dynamic button labels after applyI18n reset
 });
+
+// ============================================================================
+//  Settings — app-wide defaults for new projects + appearance
+// ============================================================================
+async function renderSettings() {
+  const s = await window.api.getSettings();
+  $('#set-source').value = s.sourceLang || 'English';
+  $('#set-target').value = s.targetLang || 'Arabic';
+  $('#set-url').value = s.apiUrl || 'http://localhost:1234/v1/chat/completions';
+  $('#set-model').value = s.model || '';
+  $('#set-context').value = s.contextWindow ?? 2;
+  $('#set-target').dir = isRtlLang($('#set-target').value) ? 'rtl' : 'auto';
+  $('#set-test-result').textContent = '';
+  $('#set-test-result').className = 'test-result';
+  // Appearance reflects the current device state.
+  $('#set-theme').value = currentTheme();
+  $('#set-lang').value = getLang();
+}
+
+async function saveSettingsForm() {
+  await window.api.saveSettings({
+    sourceLang: $('#set-source').value.trim() || 'English',
+    targetLang: $('#set-target').value.trim() || 'Arabic',
+    apiUrl: $('#set-url').value.trim(),
+    model: $('#set-model').value.trim(),
+    contextWindow: Math.max(0, parseInt($('#set-context').value, 10) || 0),
+  });
+}
+
+['#set-source', '#set-target', '#set-url', '#set-model', '#set-context']
+  .forEach((sel) => $(sel).addEventListener('change', saveSettingsForm));
+$('#set-test').addEventListener('click', () => runConnectionTest($('#set-url').value, $('#set-test-result')));
+$('#set-theme').addEventListener('change', (e) => applyTheme(e.target.value));
+$('#set-lang').addEventListener('change', (e) => setLang(e.target.value));
 
 // ---- Boot -------------------------------------------------------------------
 setLang(localStorage.getItem('lang') || 'en');   // applies static i18n + fires langchange → renderLibrary
