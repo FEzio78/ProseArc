@@ -1,4 +1,6 @@
-# ProseArc
+<p align="center">
+  <img src="assets/logo.png" alt="ProseArc" width="420" />
+</p>
 
 A **calm, offline, human‑in‑the‑loop workspace for translating novels** with a local AI model. Import a manuscript, let a local model produce a first‑pass translation, then review it side‑by‑side and polish it — keeping full control over quality, consistency, and tone.
 

@@ -37,7 +37,8 @@
       "!BUILD_BRIEF.md"
     ],
     "win": {
-      "target": "portable"
+      "target": "portable",
+      "icon": "build/icon.ico"
     },
     "portable": {
       "artifactName": "ProseArc.exe"

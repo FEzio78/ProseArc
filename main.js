@@ -26,6 +26,7 @@ function createWindow() {
     minHeight: 600,
     backgroundColor: '#1F1E26',
     autoHideMenuBar: true,   // hide the dev-looking File/Edit/View bar; Alt reveals it
+    icon: path.join(__dirname, 'build', 'icon.ico'), // window + taskbar icon in dev
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
