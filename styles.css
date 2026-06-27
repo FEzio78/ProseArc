@@ -935,3 +935,31 @@ textarea.pane-body {
   content: ''; position: absolute; inset-block: 2px; inline-size: 3px; border-radius: 2px;
   inset-inline-end: -10px; background: var(--accent);
 }
+
+/* ---- Book hub ------------------------------------------------------------ */
+.hub-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent; border: none; color: var(--muted); cursor: pointer;
+  font-family: var(--font-ui); font-size: 0.9rem; padding: 6px 0; margin-bottom: 18px;
+}
+.hub-back:hover { color: var(--text); }
+.hub-back span:first-child { font-size: 1.2rem; line-height: 1; }
+.hub-card {
+  display: flex; gap: 28px; max-width: 680px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px;
+}
+.hub-cover {
+  position: relative; width: 120px; height: 172px; flex-shrink: 0;
+  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+}
+.hub-cover::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px;
+  background: var(--accent); border-radius: 8px 8px 0 0;
+}
+.hub-cover span { font-family: var(--font-serif); font-size: 3rem; color: rgba(255, 255, 255, 0.92); }
+.hub-info { flex: 1; min-width: 0; }
+.hub-info h1 { font-family: var(--font-serif); font-size: 1.6rem; margin: 0 0 6px; }
+.hub-langs { color: var(--muted); font-size: 0.9rem; margin-bottom: 18px; }
+.hub-progress { margin-bottom: 22px; }
+.hub-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.hub-meta-actions { display: flex; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
