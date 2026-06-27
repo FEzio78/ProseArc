@@ -176,6 +176,8 @@ body, .sidebar, .panel, .navigator, .editor, .project-card, .modal, .nav-item {
   transition: background var(--ease);
 }
 .nav-item:disabled { opacity: 0.4; cursor: default; }
+.nav-item.boxed { border: 1px solid var(--line); font-size: 0.84rem; }
+.nav-item .ic { font-size: 0.95rem; line-height: 1; }
 .nav-spacer { flex: 1; }
 
 .theme-toggle {

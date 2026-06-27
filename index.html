@@ -22,6 +22,8 @@
 
     <div class="nav-spacer"></div>
 
+    <button class="nav-item boxed" data-view="settings"><span class="ic" aria-hidden="true">⚙️</span><span data-i18n="nav.settings">Settings</span></button>
+
     <button class="theme-toggle" id="lang-toggle" title="Language">
       <span class="ic">🌐</span>
       <span id="lang-lbl">العربية</span>
@@ -235,6 +237,73 @@
         <span class="gl-scope" data-i18n="gloss.suggestedHint">· recurring terms found in this book</span>
       </h3>
       <div id="gl-suggest-list" hidden></div>
+    </section>
+
+    <!-- SETTINGS — app-wide defaults --------------------------------------- -->
+    <section class="view" id="view-settings">
+      <div class="view-head">
+        <div>
+          <h1 data-i18n="set.title">Settings</h1>
+          <p class="lede" data-i18n="set.lede">Defaults applied to new projects, and app appearance.</p>
+        </div>
+      </div>
+
+      <div class="ws-grid">
+        <!-- Defaults for new projects -->
+        <div class="panel">
+          <h3 class="panel-title" data-i18n="set.defaults">Defaults for new projects</h3>
+          <div class="field-row">
+            <div class="field">
+              <label for="set-source" data-i18n="f.source">Source language</label>
+              <input id="set-source" type="text" />
+            </div>
+            <div class="field">
+              <label for="set-target" data-i18n="f.target">Target language</label>
+              <input id="set-target" type="text" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="set-url" data-i18n="f.url">Local API URL</label>
+            <input id="set-url" type="text" />
+            <div class="test-row">
+              <button class="btn btn-ghost btn-sm" id="set-test" data-i18n="ws.test">Test connection</button>
+              <span class="test-result" id="set-test-result"></span>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="set-model"><span data-i18n="f.model">Model name</span>
+                <span class="hint" data-i18n="f.modelOpt">(optional)</span></label>
+              <input id="set-model" type="text" data-i18n-ph="f.modelPh" placeholder="leave blank for loaded model" />
+            </div>
+            <div class="field" style="max-width:140px">
+              <label for="set-context" data-i18n="f.context">Context window</label>
+              <input id="set-context" type="number" min="0" max="10" />
+            </div>
+          </div>
+          <p class="settings-note" data-i18n="set.note">These apply to new projects only. Each project keeps its own settings, editable in its Workspace.</p>
+        </div>
+
+        <!-- Appearance -->
+        <div class="panel">
+          <h3 class="panel-title" data-i18n="set.appearance">Appearance</h3>
+          <div class="field">
+            <label for="set-theme" data-i18n="set.theme">Theme</label>
+            <select id="set-theme">
+              <option value="dark" data-i18n="theme.dark">Dark</option>
+              <option value="light" data-i18n="theme.light">Light</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="set-lang" data-i18n="set.language">Interface language</label>
+            <select id="set-lang">
+              <option value="en">English</option>
+              <option value="ar">العربية</option>
+            </select>
+          </div>
+          <p class="settings-note" data-i18n="set.appearanceNote">Appearance is saved on this device.</p>
+        </div>
+      </div>
     </section>
   </main>
 
