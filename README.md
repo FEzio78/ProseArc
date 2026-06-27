@@ -8,6 +8,12 @@ A **calm, offline, human‑in‑the‑loop workspace for translating novels** wi
 
 Built with Electron + plain HTML/CSS/JS — no framework, no build step.
 
+## Download
+
+**[⬇ Download the latest release](https://github.com/FEzio78/ProseArc/releases/latest)** — a portable `.exe` (no install, just run) or a Windows installer.
+
+> ProseArc needs a local AI server to translate — see [Requirements](#requirements). Nothing leaves your machine.
+
 ---
 
 ## Features
