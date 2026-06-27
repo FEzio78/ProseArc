@@ -37,11 +37,20 @@
       "!BUILD_BRIEF.md"
     ],
     "win": {
-      "target": "portable",
+      "target": [
+        "portable",
+        "nsis"
+      ],
       "icon": "build/icon.ico"
     },
     "portable": {
-      "artifactName": "ProseArc.exe"
+      "artifactName": "ProseArc-${version}-portable.exe"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "ProseArc",
+      "artifactName": "ProseArc-Setup-${version}.exe"
     }
   },
   "devDependencies": {
