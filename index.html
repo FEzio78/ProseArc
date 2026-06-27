@@ -208,9 +208,11 @@
         <div class="rd-bar">
           <div class="rd-bar-left">
             <button class="btn btn-ghost btn-sm" id="rd-toc-btn" data-i18n="reader.contents">☰ Contents</button>
+            <button class="btn btn-ghost btn-sm" id="rd-marks-btn" data-i18n="reader.bookmarks">🔖 Bookmarks</button>
             <span class="rd-title" id="rd-title"></span>
           </div>
           <div class="rd-controls">
+            <button class="btn btn-ghost btn-sm" id="rd-bilingual" data-i18n="reader.bilingual">Bilingual</button>
             <select id="rd-font" title="Font">
               <option value="serif" data-i18n="reader.fSerif">Serif</option>
               <option value="amiri">Amiri</option>
@@ -235,9 +237,24 @@
 
         <div class="rd-layout">
           <aside class="rd-toc" id="rd-toc" hidden></aside>
+          <aside class="rd-toc" id="rd-marks" hidden></aside>
           <div class="rd-scroll" id="rd-scroll">
-            <div class="rd-content" id="rd-content"></div>
+            <div class="rd-content" id="rd-content">
+              <div class="rd-flow" id="rd-flow"></div>
+              <div class="rd-gutter" id="rd-gutter" hidden>
+                <button class="rd-gutter-btn" id="rd-g-mark" title="Bookmark">★</button>
+                <button class="rd-gutter-btn" id="rd-g-note" title="Note">✎</button>
+              </div>
+              <div class="rd-note-pop" id="rd-note-pop" hidden>
+                <textarea id="rd-note-text" rows="3" data-i18n-ph="reader.notePh" placeholder="Note on this paragraph…"></textarea>
+                <div class="rd-note-actions">
+                  <button class="btn btn-ghost btn-sm" id="rd-note-del" data-i18n="reader.noteDelete">Delete</button>
+                  <button class="btn btn-primary btn-sm" id="rd-note-save" data-i18n="reader.noteSave">Save</button>
+                </div>
+              </div>
+            </div>
           </div>
+          <div class="rd-pageind" id="rd-pageind" hidden></div>
         </div>
       </div>
     </section>

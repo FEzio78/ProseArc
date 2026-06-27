@@ -1292,7 +1292,7 @@ function buildToc(project) {
 function readerPrefs() {
   let p = {};
   try { p = JSON.parse(localStorage.getItem('reader-prefs')) || {}; } catch { /* ignore */ }
-  return { font: 'serif', size: 18, width: 'medium', theme: 'dark', ...p };
+  return { font: 'serif', size: 18, width: 'medium', theme: 'dark', bilingual: false, ...p };
 }
 function saveReaderPrefs(p) { localStorage.setItem('reader-prefs', JSON.stringify(p)); }
 
@@ -1302,14 +1302,16 @@ function applyReaderPrefs() {
   content.style.fontFamily = RD_FONTS[p.font] || RD_FONTS.serif;
   content.style.fontSize = `${p.size}px`;
   content.style.maxWidth = RD_WIDTHS[p.width] || RD_WIDTHS.medium;
+  content.classList.toggle('rd-bilingual', !!p.bilingual);
   const scroll = $('#rd-scroll');
   scroll.classList.remove('rd-dark', 'rd-sepia', 'rd-light');
   scroll.classList.add(`rd-${p.theme}`);
   $('#rd-font').value = p.font; $('#rd-width').value = p.width; $('#rd-theme').value = p.theme;
+  $('#rd-bilingual').classList.toggle('active', !!p.bilingual);
 }
 
 function indexReaderOffsets() {
-  rdOffsets = Array.from($('#rd-content').querySelectorAll('[data-seg]'))
+  rdOffsets = Array.from($('#rd-flow').querySelectorAll('[data-seg]'))
     .map((el) => ({ id: el.dataset.seg, top: el.offsetTop }));
 }
 function topmostSeg() {
@@ -1324,6 +1326,11 @@ function updateReadProgress() {
   const max = s.scrollHeight - s.clientHeight;
   const pct = max > 0 ? Math.min(100, Math.round((s.scrollTop / max) * 100)) : 0;
   $('#rd-progress-fill').style.width = `${pct}%`;
+  // Estimated pages by screen-height (shifts with font size / window — that's expected).
+  const per = Math.max(1, s.clientHeight - 40);
+  const pages = Math.max(1, Math.ceil(s.scrollHeight / per));
+  const page = Math.min(pages, Math.floor(s.scrollTop / per) + 1);
+  $('#rd-pageind').textContent = t('reader.pageInd', { pct, page, pages });
 }
 
 function renderReader() {
@@ -1336,13 +1343,18 @@ function renderReader() {
   $('#reader-panel').hidden = false;
   $('#rd-title').textContent = currentProject.name;
 
-  const content = $('#rd-content');
-  const rebuild = readerProjectId !== currentProject.id || !content.hasChildNodes();
+  const flow = $('#rd-flow');
+  const rebuild = readerProjectId !== currentProject.id || !flow.hasChildNodes();
   if (rebuild) {
-    content.innerHTML = buildReaderHtml(currentProject);
-    content.dir = isRtlLang(currentProject.targetLang) ? 'rtl' : 'ltr';
+    flow.innerHTML = buildReaderHtml(currentProject);
+    $('#rd-content').dir = isRtlLang(currentProject.targetLang) ? 'rtl' : 'ltr';
     buildToc(currentProject);
+    markAnnotated();
     $('#rd-toc').hidden = true;
+    $('#rd-marks').hidden = true;
+    $('#rd-gutter').hidden = true;
+    $('#rd-note-pop').hidden = true;
+    $('#rd-pageind').hidden = false;
     readerProjectId = currentProject.id;
   }
   applyReaderPrefs();
@@ -1384,12 +1396,208 @@ $('#rd-width').addEventListener('change', (e) => setReaderPref('width', e.target
 $('#rd-theme').addEventListener('change', (e) => setReaderPref('theme', e.target.value, false));
 $('#rd-bigger').addEventListener('click', () => bumpReaderSize(1));
 $('#rd-smaller').addEventListener('click', () => bumpReaderSize(-1));
-$('#rd-toc-btn').addEventListener('click', () => { $('#rd-toc').hidden = !$('#rd-toc').hidden; });
+// Side panels: Contents and Bookmarks share the left column, one at a time.
+function togglePanel(which) {
+  const toc = $('#rd-toc');
+  const marks = $('#rd-marks');
+  if (which === 'toc') { toc.hidden = !toc.hidden; marks.hidden = true; }
+  else { marks.hidden = !marks.hidden; toc.hidden = true; if (!marks.hidden) renderBookmarks(); }
+}
+function jumpToSeg(segId) {
+  const el = document.getElementById(`rd-seg-${segId}`);
+  if (el) el.scrollIntoView({ block: 'start' });
+}
+$('#rd-toc-btn').addEventListener('click', () => togglePanel('toc'));
+$('#rd-marks-btn').addEventListener('click', () => togglePanel('marks'));
 $('#rd-toc').addEventListener('click', (e) => {
   const b = e.target.closest('[data-go]');
-  if (!b) return;
-  const el = document.getElementById(`rd-seg-${b.dataset.go}`);
-  if (el) el.scrollIntoView({ block: 'start' });
+  if (b) jumpToSeg(b.dataset.go);
+});
+
+// ---- Bookmarks (per project, stored on this device) -------------------------
+function getBookmarks(pid) {
+  try { return JSON.parse(localStorage.getItem(`reader-marks:${pid}`)) || []; } catch { return []; }
+}
+function saveBookmarks(pid, arr) { localStorage.setItem(`reader-marks:${pid}`, JSON.stringify(arr)); }
+
+function segSnippet(segId) {
+  const s = currentProject && currentProject.segments[Number(segId)];
+  if (!s) return `#${segId}`;
+  const txt = (s.translation && s.translation.trim()) ? s.translation.trim() : (s.original || '');
+  return stripMd(txt).slice(0, 60) || `#${segId}`;
+}
+function addBookmarkHere() {
+  if (!currentProject) return;
+  const seg = topmostSeg();
+  if (seg == null) return;
+  const pid = currentProject.id;
+  const arr = getBookmarks(pid);
+  if (arr.some((b) => String(b.seg) === String(seg))) { toast(t('reader.markExists')); return; }
+  arr.push({ seg: String(seg) });
+  saveBookmarks(pid, arr);
+  renderBookmarks();
+  markAnnotated();
+  toast(t('reader.marked'));
+}
+function renderBookmarks() {
+  const wrap = $('#rd-marks');
+  const pid = currentProject ? currentProject.id : null;
+  const arr = (pid ? getBookmarks(pid) : []).slice().sort((a, b) => Number(a.seg) - Number(b.seg));
+  let html = `<div class="rd-marks-head"><span>${escapeHtml(t('reader.bookmarks'))}</span>` +
+    `<button class="btn btn-ghost btn-sm" id="rd-mark-add">${escapeHtml(t('reader.addMark'))}</button></div>`;
+  if (arr.length === 0) {
+    html += `<div class="rd-marks-empty">${escapeHtml(t('reader.noMarks'))}</div>`;
+  } else {
+    html += arr.map((b) => {
+      const label = b.note ? `“${b.note}”` : segSnippet(b.seg);
+      const icon = b.note ? '✎ ' : '';
+      return `<div class="rd-mark-row" data-go="${b.seg}"><span class="rd-mark-label">${icon}${escapeHtml(label)}</span>` +
+        `<button class="rd-mark-del" data-del="${b.seg}" title="${escapeHtml(t('reader.removeMark'))}">✕</button></div>`;
+    }).join('');
+  }
+  wrap.innerHTML = html;
+}
+$('#rd-marks').addEventListener('click', (e) => {
+  if (e.target.closest('#rd-mark-add')) { addBookmarkHere(); return; }
+  const del = e.target.closest('[data-del]');
+  if (del) {
+    const pid = currentProject.id;
+    saveBookmarks(pid, getBookmarks(pid).filter((b) => String(b.seg) !== String(del.dataset.del)));
+    renderBookmarks();
+    markAnnotated();
+    return;
+  }
+  const row = e.target.closest('[data-go]');
+  if (row) jumpToSeg(row.dataset.go);
+});
+
+// ---- Bilingual: tap a paragraph to reveal its original ----------------------
+$('#rd-bilingual').addEventListener('click', () => {
+  const p = readerPrefs();
+  p.bilingual = !p.bilingual;
+  saveReaderPrefs(p);
+  applyReaderPrefs();
+  if (!p.bilingual) {
+    $$('#rd-content .rd-orig').forEach((n) => n.remove());
+    indexReaderOffsets();
+  } else {
+    toast(t('reader.bilingualHint'));
+  }
+});
+$('#rd-content').addEventListener('click', (e) => {
+  if (!readerPrefs().bilingual) return;
+  if (!window.getSelection().isCollapsed) return; // don't fire while selecting text
+  const el = e.target.closest('[data-seg]');
+  if (!el || !currentProject) return;
+  const seg = currentProject.segments[Number(el.dataset.seg)];
+  if (!seg || seg.type === 'scene-break' || !seg.original) return;
+  const next = el.nextElementSibling;
+  if (next && next.classList.contains('rd-orig')) {
+    next.remove();
+  } else {
+    const div = document.createElement('div');
+    div.className = 'rd-orig';
+    div.dir = isRtlLang(currentProject.sourceLang) ? 'rtl' : 'ltr';
+    div.innerHTML = inlineMd(seg.original);
+    el.insertAdjacentElement('afterend', div);
+  }
+  indexReaderOffsets();
+});
+
+// ---- Margin annotations: per-paragraph bookmark + note ----------------------
+function annoEntry(seg) {
+  if (!currentProject || seg == null) return null;
+  return getBookmarks(currentProject.id).find((b) => String(b.seg) === String(seg)) || null;
+}
+function setMark(seg, on) {
+  if (!currentProject) return;
+  const pid = currentProject.id;
+  const arr = getBookmarks(pid);
+  const i = arr.findIndex((b) => String(b.seg) === String(seg));
+  if (on) { if (i < 0) arr.push({ seg: String(seg) }); }
+  else if (i >= 0) arr.splice(i, 1);
+  saveBookmarks(pid, arr);
+  markAnnotated();
+}
+function setNote(seg, text) {
+  if (!currentProject) return;
+  const pid = currentProject.id;
+  const arr = getBookmarks(pid);
+  const i = arr.findIndex((b) => String(b.seg) === String(seg));
+  const note = (text || '').trim();
+  if (i >= 0) { if (note) arr[i].note = note; else delete arr[i].note; }
+  else if (note) arr.push({ seg: String(seg), note });
+  saveBookmarks(pid, arr);
+  markAnnotated();
+}
+function markAnnotated() {
+  const flow = $('#rd-flow');
+  flow.querySelectorAll('.rd-annotated').forEach((el) => el.classList.remove('rd-annotated', 'rd-has-note'));
+  if (!currentProject) return;
+  for (const b of getBookmarks(currentProject.id)) {
+    const el = document.getElementById(`rd-seg-${b.seg}`);
+    if (el) { el.classList.add('rd-annotated'); if (b.note) el.classList.add('rd-has-note'); }
+  }
+}
+
+let gutterSeg = null;
+let gutterHideTimer = null;
+function refreshGutterState() {
+  const e = annoEntry(gutterSeg);
+  $('#rd-g-mark').classList.toggle('on', !!e);
+  $('#rd-g-note').classList.toggle('on', !!(e && e.note));
+}
+$('#rd-content').addEventListener('mouseover', (e) => {
+  clearTimeout(gutterHideTimer);
+  if (e.target.closest('#rd-gutter') || e.target.closest('#rd-note-pop')) return;
+  const el = e.target.closest('[data-seg]');
+  if (!el || !currentProject) return;
+  const seg = currentProject.segments[Number(el.dataset.seg)];
+  if (!seg || seg.type === 'scene-break') return;
+  gutterSeg = el.dataset.seg;
+  const g = $('#rd-gutter');
+  g.style.top = `${el.offsetTop}px`;
+  g.hidden = false;
+  refreshGutterState();
+});
+// Hide after a short grace period so moving onto the control never loses it.
+$('#rd-content').addEventListener('mouseleave', () => {
+  gutterHideTimer = setTimeout(() => { if ($('#rd-note-pop').hidden) $('#rd-gutter').hidden = true; }, 260);
+});
+$('#rd-gutter').addEventListener('mouseenter', () => clearTimeout(gutterHideTimer));
+$('#rd-g-mark').addEventListener('click', () => {
+  if (gutterSeg == null) return;
+  setMark(gutterSeg, !annoEntry(gutterSeg));
+  refreshGutterState();
+  if (!$('#rd-marks').hidden) renderBookmarks();
+});
+$('#rd-g-note').addEventListener('click', () => openNotePop(gutterSeg));
+
+// Note editor popover
+let notePopSeg = null;
+function openNotePop(seg) {
+  if (seg == null) return;
+  notePopSeg = seg;
+  const e = annoEntry(seg);
+  $('#rd-note-text').value = (e && e.note) || '';
+  const el = document.getElementById(`rd-seg-${seg}`);
+  if (el) $('#rd-note-pop').style.top = `${el.offsetTop}px`;
+  $('#rd-note-pop').hidden = false;
+  $('#rd-note-text').focus();
+}
+function closeNotePop() { $('#rd-note-pop').hidden = true; notePopSeg = null; }
+$('#rd-note-save').addEventListener('click', () => {
+  if (notePopSeg != null) setNote(notePopSeg, $('#rd-note-text').value);
+  closeNotePop();
+  if (!$('#rd-marks').hidden) renderBookmarks();
+});
+$('#rd-note-del').addEventListener('click', () => {
+  if (notePopSeg != null) setNote(notePopSeg, '');
+  closeNotePop();
+  if (!$('#rd-marks').hidden) renderBookmarks();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('#rd-note-pop').hidden) closeNotePop();
 });
 
 let rdPosTimer;

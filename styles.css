@@ -858,7 +858,7 @@ textarea.pane-body {
 }
 .rd-content {
   position: relative;
-  max-width: 760px; margin: 0 auto; padding: 32px 28px 90px;
+  max-width: 760px; margin: 0 auto; padding: 32px 52px 90px;
   font-family: var(--font-serif); font-size: 1.12rem; line-height: 1.95; color: var(--text);
 }
 .rd-content p { margin: 0 0 1em; text-align: justify; }
@@ -874,6 +874,24 @@ textarea.pane-body {
 .rd-content em { font-style: italic; }
 .rd-content strong { font-weight: 600; }
 
+/* Bilingual: tap-to-reveal original */
+.rd-content.rd-bilingual [data-seg] { cursor: pointer; }
+.rd-orig {
+  margin: -0.2em 0 1.1em; padding-inline-start: 0.9em;
+  border-inline-start: 2px solid currentColor; opacity: 0.7;
+  font-size: 0.92em; font-style: italic;
+}
+#rd-bilingual.active { background: var(--accent-soft); color: var(--text); border-color: var(--accent-soft); }
+
+/* Bookmarks panel */
+.rd-marks-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 0.8rem; color: var(--muted); }
+.rd-marks-empty { color: var(--muted); font-size: 0.85rem; padding: 8px; }
+.rd-mark-row { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: var(--radius-sm); cursor: pointer; }
+.rd-mark-row:hover { background: var(--surface-2); }
+.rd-mark-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-ui); font-size: 0.85rem; color: var(--text); }
+.rd-mark-del { background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 2px 6px; border-radius: var(--radius-sm); flex-shrink: 0; }
+.rd-mark-del:hover { color: var(--danger); background: rgba(196,123,110,0.1); }
+
 /* Reading themes (the reading surface only) */
 .rd-scroll.rd-dark { background: #1b1a21; border-color: #2a2832; }
 .rd-scroll.rd-dark .rd-content { color: #e8e4da; }
@@ -883,3 +901,37 @@ textarea.pane-body {
 .rd-scroll.rd-light { background: #ffffff; border-color: #e3e0d8; }
 .rd-scroll.rd-light .rd-content { color: #1a1a1a; }
 .rd-scroll.rd-light blockquote { color: #555; border-color: #ccc; }
+
+/* Margin annotations: hover gutter, note popover, page indicator */
+.rd-layout { position: relative; }
+.rd-gutter { position: absolute; inset-inline-end: 4px; display: flex; flex-direction: column; gap: 4px; z-index: 5; }
+.rd-gutter-btn {
+  width: 30px; height: 30px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--muted); cursor: pointer; font-size: 0.9rem;
+}
+.rd-gutter-btn:hover { color: var(--text); background: var(--surface-2); }
+.rd-gutter-btn.on { color: var(--accent); border-color: var(--accent-soft); }
+
+.rd-note-pop {
+  position: absolute; inset-inline-end: 0; width: 280px; max-width: 80%; z-index: 10;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 10px;
+}
+.rd-note-pop textarea {
+  width: 100%; background: var(--bg); border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  color: var(--text); font-family: var(--font-ui); font-size: 0.9rem; padding: 8px; resize: vertical;
+}
+.rd-note-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+.rd-pageind {
+  position: absolute; bottom: 10px; inset-inline-end: 14px; z-index: 6; pointer-events: none;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  padding: 4px 12px; font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+
+.rd-flow [data-seg].rd-annotated { position: relative; }
+.rd-flow [data-seg].rd-annotated::before {
+  content: ''; position: absolute; inset-block: 2px; inline-size: 3px; border-radius: 2px;
+  inset-inline-end: -10px; background: var(--accent);
+}
