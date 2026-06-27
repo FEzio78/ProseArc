@@ -7,8 +7,12 @@
 const I18N = {
   en: {
     'brand.sub': "The translator's desk",
-    'nav.library': 'Library', 'nav.workspace': 'Workspace', 'nav.review': 'Review', 'nav.glossary': 'Glossary', 'nav.settings': 'Settings',
+    'nav.library': 'Library', 'nav.workspace': 'Workspace', 'nav.review': 'Review', 'nav.reader': 'Read', 'nav.glossary': 'Glossary', 'nav.settings': 'Settings',
     'theme.dark': 'Dark', 'theme.light': 'Light',
+    'reader.lede': 'Read your translation as a book.',
+    'reader.empty': 'Open a project from the Library to read it here.',
+    'reader.contents': '☰ Contents', 'reader.fSerif': 'Serif', 'reader.fSans': 'Sans',
+    'reader.wNarrow': 'Narrow', 'reader.wMedium': 'Medium', 'reader.wWide': 'Wide', 'reader.sepia': 'Sepia',
     'set.title': 'Settings', 'set.lede': 'Defaults applied to new projects, and app appearance.',
     'set.defaults': 'Defaults for new projects',
     'set.note': 'These apply to new projects only. Each project keeps its own settings, editable in its Workspace.',
@@ -141,8 +145,12 @@ const I18N = {
 
   ar: {
     'brand.sub': 'مكتب المترجم',
-    'nav.library': 'المكتبة', 'nav.workspace': 'مساحة العمل', 'nav.review': 'المراجعة', 'nav.glossary': 'المسرد', 'nav.settings': 'الإعدادات',
+    'nav.library': 'المكتبة', 'nav.workspace': 'مساحة العمل', 'nav.review': 'المراجعة', 'nav.reader': 'قراءة', 'nav.glossary': 'المسرد', 'nav.settings': 'الإعدادات',
     'theme.dark': 'داكن', 'theme.light': 'فاتح',
+    'reader.lede': 'اقرأ ترجمتك ككتاب.',
+    'reader.empty': 'افتح مشروعًا من المكتبة لقراءته هنا.',
+    'reader.contents': '☰ المحتويات', 'reader.fSerif': 'سيريف', 'reader.fSans': 'بلا زوائد',
+    'reader.wNarrow': 'ضيق', 'reader.wMedium': 'متوسط', 'reader.wWide': 'عريض', 'reader.sepia': 'بنّي فاتح',
     'set.title': 'الإعدادات', 'set.lede': 'إعدادات افتراضية تُطبَّق على المشاريع الجديدة، ومظهر التطبيق.',
     'set.defaults': 'الإعدادات الافتراضية للمشاريع الجديدة',
     'set.note': 'تنطبق على المشاريع الجديدة فقط. يحتفظ كل مشروع بإعداداته الخاصة، القابلة للتعديل في مساحة عمله.',
