@@ -21,21 +21,57 @@ function createEngine({ store }) {
   let aborted = false;
   let controller = null;   // AbortController for the in-flight request
   let emit = () => {};
+  let activeSecrets = {};   // cloud API keys, loaded once per run
+
+  // Turn a project + messages into a provider-specific HTTP request.
+  // Most providers speak the OpenAI chat-completions shape; Anthropic is native.
+  function resolveRequest(project, messages) {
+    const provider = project.provider || 'local';
+    const model = (project.model || '').trim();
+    const s = activeSecrets || {};
+
+    if (provider === 'anthropic') {
+      const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
+      const rest = messages.filter((m) => m.role !== 'system').map((m) => ({ role: m.role, content: m.content }));
+      return {
+        url: 'https://api.anthropic.com/v1/messages',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': s.anthropic || '', 'anthropic-version': '2023-06-01' },
+        body: { model: model || 'claude-3-5-sonnet-latest', max_tokens: 4096, temperature: 0.3, ...(system ? { system } : {}), messages: rest },
+        shape: 'anthropic',
+        missingKey: !s.anthropic,
+      };
+    }
+
+    const headers = { 'Content-Type': 'application/json' };
+    let url;
+    let missingKey = false;
+    if (provider === 'openai') { url = 'https://api.openai.com/v1/chat/completions'; headers.Authorization = `Bearer ${s.openai || ''}`; missingKey = !s.openai; }
+    else if (provider === 'openrouter') { url = 'https://openrouter.ai/api/v1/chat/completions'; headers.Authorization = `Bearer ${s.openrouter || ''}`; missingKey = !s.openrouter; }
+    else if (provider === 'gemini') { url = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'; headers.Authorization = `Bearer ${s.gemini || ''}`; missingKey = !s.gemini; }
+    else if (provider === 'compatible') { url = `${(s.compatibleBaseUrl || '').replace(/\/+$/, '')}/chat/completions`; if (s.compatible) headers.Authorization = `Bearer ${s.compatible}`; missingKey = !s.compatibleBaseUrl; }
+    else { url = project.apiUrl; } // local
+
+    return {
+      url,
+      headers,
+      body: { model: model || 'local-model', messages, temperature: 0.3, stream: false },
+      shape: 'openai',
+      missingKey,
+    };
+  }
 
   /** One translation request. Throws tagged errors for the retry/friendly layers. */
   async function translateOne(project, index, signal, globalGlossary) {
     const messages = buildMessages(project, index, globalGlossary);
-    const body = {
-      model: project.model && project.model.trim() ? project.model.trim() : 'local-model',
-      messages,
-      temperature: 0.3,
-      stream: false,
-    };
+    const req = resolveRequest(project, messages);
+    if (req.missingKey) {
+      const err = new Error('no api key'); err.noKey = true; throw err;
+    }
 
-    const res = await fetch(project.apiUrl, {
+    const res = await fetch(req.url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      headers: req.headers,
+      body: JSON.stringify(req.body),
       signal,
     });
 
@@ -49,7 +85,9 @@ function createEngine({ store }) {
     }
 
     const json = await res.json();
-    const content = json?.choices?.[0]?.message?.content;
+    const content = req.shape === 'anthropic'
+      ? (Array.isArray(json?.content) ? json.content.filter((b) => b.type === 'text').map((b) => b.text).join('') : '')
+      : json?.choices?.[0]?.message?.content;
     if (!content || !content.trim()) {
       const err = new Error('empty');
       err.empty = true;
@@ -59,6 +97,7 @@ function createEngine({ store }) {
   }
 
   function isRetryable(err) {
+    if (err.noKey) return false; // config problem, not transient
     if (err.timeout) return true;
     if (err.httpStatus) return err.httpStatus >= 500 || err.httpStatus === 429;
     return true; // network-level (server warming up, transient blip)
@@ -103,6 +142,7 @@ function createEngine({ store }) {
   /** Map a raw error to a { key, params } the renderer can translate. */
   function friendlyError(err) {
     const code = err && err.cause && err.cause.code;
+    if (err.noKey) return { key: 'noKey', params: {} };
     if (err.timeout) return { key: 'timeout', params: { sec: Math.round(REQUEST_TIMEOUT_MS / 1000) } };
     if (code === 'ECONNREFUSED' || /fetch failed/i.test(err.message)) return { key: 'unreachable', params: {} };
     if (err.httpStatus === 404) return { key: 'http404', params: {} };
@@ -125,6 +165,7 @@ function createEngine({ store }) {
 
     const total = project.segments.length;
     const globalGlossary = await store.getGlobalGlossary();
+    activeSecrets = await store.getSecrets();
     emit({ type: 'started' });
     emit({ type: 'progress', counts: counts(project) });
 
@@ -196,6 +237,7 @@ function createEngine({ store }) {
     if (index === -1) { emit({ type: 'error', key: 'segNotFound', params: {} }); running = false; return; }
 
     const globalGlossary = await store.getGlobalGlossary();
+    activeSecrets = await store.getSecrets();
     emit({ type: 'started', mode: 'single' });
     emit({ type: 'log', level: 'info', key: 'retranslating', params: { n: index + 1 } });
 

@@ -138,6 +138,8 @@ async function loadProject(id) {
   $('#ws-model').value = project.model || '';
   $('#ws-context').value = project.contextWindow;
   $('#ws-style').value = project.styleBrief || '';
+  $('#ws-provider').value = project.provider || 'local';
+  applyProviderVisibility(project.provider || 'local', '#ws-url-field', '#ws-provider-note');
 
   renderProgress(countStatuses(project.segments));
   clearError();
@@ -219,6 +221,7 @@ async function saveSettings() {
   currentProject.model = $('#ws-model').value.trim();
   currentProject.contextWindow = Math.max(0, parseInt($('#ws-context').value, 10) || 0);
   currentProject.styleBrief = $('#ws-style').value.trim();
+  currentProject.provider = $('#ws-provider').value;
 
   $('#ws-title').textContent = currentProject.name;
   $('#ws-langs').textContent = `${currentProject.sourceLang} → ${currentProject.targetLang}`;
@@ -226,8 +229,18 @@ async function saveSettings() {
   await window.api.saveProject(currentProject);
 }
 
-['#ws-name', '#ws-source', '#ws-target', '#ws-url', '#ws-model', '#ws-context', '#ws-style']
+// Show the API-URL field only for the local provider; show a key hint for cloud.
+function applyProviderVisibility(provider, urlFieldSel, noteSel) {
+  const local = provider === 'local';
+  const urlEl = $(urlFieldSel);
+  if (urlEl) urlEl.style.display = local ? '' : 'none';
+  if (noteSel) { const n = $(noteSel); if (n) n.style.display = local ? 'none' : ''; }
+}
+
+['#ws-name', '#ws-source', '#ws-target', '#ws-url', '#ws-model', '#ws-context', '#ws-style', '#ws-provider']
   .forEach((sel) => $(sel).addEventListener('change', saveSettings));
+$('#ws-provider').addEventListener('change', (e) =>
+  applyProviderVisibility(e.target.value, '#ws-url-field', '#ws-provider-note'));
 
 // ---- Activity log -----------------------------------------------------------
 function logLine(message, level = 'info') {
@@ -262,7 +275,7 @@ function setEngineRunning(on) {
   btn.textContent = on ? t('ws.stop') : t('ws.start');
   btn.classList.toggle('btn-stop', on);
   // Lock settings while a run is in progress.
-  ['#ws-name', '#ws-source', '#ws-target', '#ws-url', '#ws-model', '#ws-context', '#ws-style']
+  ['#ws-name', '#ws-source', '#ws-target', '#ws-url', '#ws-model', '#ws-context', '#ws-style', '#ws-provider']
     .forEach((sel) => { $(sel).disabled = on; });
 
   // Review controls: disable editing actions; "↻ All" becomes a Stop control.
@@ -1262,6 +1275,7 @@ window.addEventListener('langchange', () => {
 // ============================================================================
 async function renderSettings() {
   const s = await window.api.getSettings();
+  $('#set-provider').value = s.provider || 'local';
   $('#set-source').value = s.sourceLang || 'English';
   $('#set-target').value = s.targetLang || 'Arabic';
   $('#set-url').value = s.apiUrl || 'http://localhost:1234/v1/chat/completions';
@@ -1270,13 +1284,23 @@ async function renderSettings() {
   $('#set-target').dir = isRtlLang($('#set-target').value) ? 'rtl' : 'auto';
   $('#set-test-result').textContent = '';
   $('#set-test-result').className = 'test-result';
+  applyProviderVisibility(s.provider || 'local', '#set-url-field', null);
   // Appearance reflects the current device state.
   $('#set-theme').value = currentTheme();
   $('#set-lang').value = getLang();
+  // API keys.
+  const sec = await window.api.getSecrets();
+  $('#key-openai').value = sec.openai || '';
+  $('#key-openrouter').value = sec.openrouter || '';
+  $('#key-gemini').value = sec.gemini || '';
+  $('#key-anthropic').value = sec.anthropic || '';
+  $('#key-compatible').value = sec.compatible || '';
+  $('#key-compatible-base').value = sec.compatibleBaseUrl || '';
 }
 
 async function saveSettingsForm() {
   await window.api.saveSettings({
+    provider: $('#set-provider').value,
     sourceLang: $('#set-source').value.trim() || 'English',
     targetLang: $('#set-target').value.trim() || 'Arabic',
     apiUrl: $('#set-url').value.trim(),
@@ -1284,9 +1308,23 @@ async function saveSettingsForm() {
     contextWindow: Math.max(0, parseInt($('#set-context').value, 10) || 0),
   });
 }
+async function saveSecretsForm() {
+  await window.api.saveSecrets({
+    openai: $('#key-openai').value.trim(),
+    openrouter: $('#key-openrouter').value.trim(),
+    gemini: $('#key-gemini').value.trim(),
+    anthropic: $('#key-anthropic').value.trim(),
+    compatible: $('#key-compatible').value.trim(),
+    compatibleBaseUrl: $('#key-compatible-base').value.trim(),
+  });
+}
 
-['#set-source', '#set-target', '#set-url', '#set-model', '#set-context']
+['#set-source', '#set-target', '#set-url', '#set-model', '#set-context', '#set-provider']
   .forEach((sel) => $(sel).addEventListener('change', saveSettingsForm));
+$('#set-provider').addEventListener('change', (e) =>
+  applyProviderVisibility(e.target.value, '#set-url-field', null));
+['#key-openai', '#key-openrouter', '#key-gemini', '#key-anthropic', '#key-compatible', '#key-compatible-base']
+  .forEach((sel) => $(sel).addEventListener('change', saveSecretsForm));
 $('#set-test').addEventListener('click', () => runConnectionTest($('#set-url').value, $('#set-test-result')));
 $('#set-theme').addEventListener('change', (e) => applyTheme(e.target.value));
 $('#set-lang').addEventListener('change', (e) => setLang(e.target.value));

@@ -16,12 +16,16 @@ const { segment, segmentBlocks } = require('./segmenter');
 const SCHEMA_VERSION = 2; // v2: segments carry a structural `type` (heading/paragraph/…)
 
 const DEFAULTS = {
+  provider: 'local',        // 'local' | 'openai' | 'openrouter' | 'gemini' | 'anthropic' | 'compatible'
   sourceLang: 'English',
   targetLang: 'Arabic',
-  apiUrl: 'http://localhost:1234/v1/chat/completions', // LM Studio default
-  model: '',                // empty = let LM Studio use whatever is loaded
+  apiUrl: 'http://localhost:1234/v1/chat/completions', // LM Studio default (used by 'local')
+  model: '',                // empty = let the local server use whatever is loaded
   contextWindow: 2,         // preceding translated segments fed as continuity
 };
+
+// API keys for cloud providers — stored separately from projects, never exported.
+const SECRET_KEYS = ['openai', 'openrouter', 'gemini', 'anthropic', 'compatible', 'compatibleBaseUrl'];
 
 function createStore(projectsDir) {
   // Make sure the directory exists once, up front.
@@ -34,9 +38,11 @@ function createStore(projectsDir) {
 
   // App-wide defaults for NEW projects (set once in the Settings tab).
   const settingsPath = path.join(path.dirname(projectsDir), 'settings-global.json');
+  // Cloud API keys live in their own file, never bundled into project JSON.
+  const secretsPath = path.join(path.dirname(projectsDir), 'secrets-global.json');
 
   // Only these keys are stored as project defaults; anything else is ignored.
-  const SETTINGS_KEYS = ['sourceLang', 'targetLang', 'apiUrl', 'model', 'contextWindow'];
+  const SETTINGS_KEYS = ['provider', 'sourceLang', 'targetLang', 'apiUrl', 'model', 'contextWindow'];
 
   /** Atomically write an object as pretty JSON to `dest`. */
   async function atomicWrite(dest, obj) {
@@ -249,6 +255,26 @@ function createStore(projectsDir) {
     return clean;
   }
 
+  /** Cloud API keys (per provider). Returns {} if none saved. */
+  async function getSecrets() {
+    try {
+      const raw = JSON.parse(await fsp.readFile(secretsPath, 'utf8'));
+      const clean = {};
+      for (const k of SECRET_KEYS) if (raw[k] !== undefined) clean[k] = raw[k];
+      return clean;
+    } catch {
+      return {};
+    }
+  }
+
+  /** Atomically save cloud API keys (only known keys are kept). */
+  async function saveSecrets(input) {
+    const clean = {};
+    for (const k of SECRET_KEYS) if (input && input[k] !== undefined) clean[k] = String(input[k]);
+    await atomicWrite(secretsPath, clean);
+    return clean;
+  }
+
   /** Delete a project file. Resolves even if it was already gone. */
   async function deleteProject(id) {
     try {
@@ -271,6 +297,8 @@ function createStore(projectsDir) {
     saveGlobalGlossary,
     getSettings,
     saveSettings,
+    getSecrets,
+    saveSecrets,
     deleteProject,
     countStatuses,
     _atomicWrite: atomicWrite, // exposed for engine use later

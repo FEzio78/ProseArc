@@ -74,6 +74,8 @@ function registerIpc() {
   ipcMain.handle('glossary:saveGlobal', (_e, glossary) => store.saveGlobalGlossary(glossary));
   ipcMain.handle('settings:get', () => store.getSettings());
   ipcMain.handle('settings:save', (_e, settings) => store.saveSettings(settings));
+  ipcMain.handle('secrets:get', () => store.getSecrets());
+  ipcMain.handle('secrets:save', (_e, secrets) => store.saveSecrets(secrets));
 
   // Open a native file picker and read the chosen manuscript.
   // Returns one of:
