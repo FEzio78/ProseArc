@@ -10,6 +10,13 @@ A **human‑in‑the‑loop workspace for translating novels** with a **local or
 
 Built with Electron + plain HTML/CSS/JS — no UI framework.
 
+## Screenshots
+
+|  |  |
+| --- | --- |
+| ![Library — your books](assets/screenshots/library_EN.png) | ![Review — original vs. translation](assets/screenshots/review_EN.png) |
+| ![Reader — read it as a book](assets/screenshots/reader_EN.png) | ![Glossary — terms & auto‑suggested names](assets/screenshots/glossary_EN.png) |
+
 ---
 
 ## Features
@@ -92,6 +99,13 @@ MIT — see [LICENSE](LICENSE).
 > **محلي افتراضيًا، وسحابي اختياريًا.** افتراضيًا، كل طلب يذهب إلى خادم *محلي* (LM Studio) — لا شيء يغادر جهازك. ويمكنك اختياريًا ربط مزوّد سحابي (OpenAI أو OpenRouter أو Gemini أو Claude)؛ عندها يُرسَل النص الذي تترجمه إلى ذلك المزوّد.
 
 مبني على Electron وHTML/CSS/JS عادي — دون إطار عمل للواجهة.
+
+## لقطات
+
+|  |  |
+| --- | --- |
+| ![المكتبة](assets/screenshots/library_AR.png) | ![المراجعة](assets/screenshots/review_AR.png) |
+| ![القارئ](assets/screenshots/reader_AR.png) | ![المسرد](assets/screenshots/glossary_AR.png) |
 
 ## المزايا
 
