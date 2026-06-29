@@ -963,3 +963,20 @@ textarea.pane-body {
 .hub-progress { margin-bottom: 22px; }
 .hub-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
 .hub-meta-actions { display: flex; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+/* ---- API keys accordion (Settings) -------------------------------------- */
+.prov { border: 1px solid var(--line); border-radius: var(--radius-sm); margin-bottom: 8px; }
+.prov > summary {
+  cursor: pointer; list-style: none; padding: 11px 13px;
+  display: flex; align-items: center; gap: 9px;
+  color: var(--text); font-family: var(--font-ui); font-size: 0.9rem;
+}
+.prov > summary::-webkit-details-marker { display: none; }
+.prov > summary::before {
+  content: '●'; color: var(--accent); font-size: 0.6rem; flex-shrink: 0;
+}
+.prov > summary::after {
+  content: '⌄'; margin-inline-start: auto; color: var(--muted); transition: transform var(--ease);
+}
+.prov[open] > summary::after { transform: rotate(180deg); }
+.prov .field { padding: 0 13px 13px; margin: 0; }

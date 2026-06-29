@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('api', {
   saveGlobalGlossary: (glossary) => ipcRenderer.invoke('glossary:saveGlobal', glossary),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (settings) => ipcRenderer.invoke('settings:save', settings),
+  getSecrets: () => ipcRenderer.invoke('secrets:get'),
+  saveSecrets: (secrets) => ipcRenderer.invoke('secrets:save', secrets),
   deleteProject: (id) => ipcRenderer.invoke('projects:delete', id),
 
   // Manuscript import (opens a native file picker, returns { fileName, text }).
