@@ -4,9 +4,9 @@
 
 <p align="center"><a href="#arabic">العربية ↓</a></p>
 
-A **human‑in‑the‑loop workspace for translating novels** with a local AI model. Import a manuscript, let a local model produce a first‑pass translation, then review it side‑by‑side, read it as a book, and polish it — keeping full control over quality, consistency, and tone.
+A **human‑in‑the‑loop workspace for translating novels** with a **local or cloud** AI model. Import a manuscript, let the model produce a first‑pass translation, then review it side‑by‑side, read it as a book, and polish it — keeping full control over quality, consistency, and tone.
 
-> **Privacy first.** Every AI call goes to a *local* OpenAI‑compatible server (LM Studio by default). Nothing leaves your machine.
+> **Local by default, cloud optional.** Out of the box, every AI call goes to a *local* server (LM Studio) — nothing leaves your machine. You can optionally connect a cloud provider (OpenAI, OpenRouter, Gemini, Claude); then the text you translate is sent to that provider.
 
 Built with Electron + plain HTML/CSS/JS — no UI framework.
 
@@ -16,6 +16,7 @@ Built with Electron + plain HTML/CSS/JS — no UI framework.
 
 - **Project library & per‑book hub** — each book is one project; open it to a page with **Read / Translate / Review / Export** and progress at a glance.
 - **Structure‑aware import** — import **TXT, Markdown, EPUB, or Word (.docx)**. Headings, paragraphs, block quotes, lists, scene breaks, and *italic* / **bold** emphasis are preserved through translation and back out to every export — not flattened into a wall of text.
+- **Local or cloud models** — translate with a **local** server (LM Studio, or any OpenAI‑compatible) *or* a **cloud** provider (**OpenAI, OpenRouter, Gemini, Claude**); choose per book. API keys are stored only on your device.
 - **Translation engine** — streams progress and a live activity log; per‑request timeout + auto‑retry; resumable runs.
 - **Per‑book translation style** — an optional brief (tone, formality, audience) sent with every segment.
 - **Split‑screen review editor** — original vs. editable translation, **RTL‑aware** (e.g. Arabic), a virtualized navigator for tens of thousands of segments, **filter by status**, search with live match **highlighting**, **find & replace** across all translations, and one‑click *retranslate* / *mark all reviewed*.
@@ -38,14 +39,21 @@ For most people — no Node, no setup:
 
 > Because the app isn't code‑signed, Windows SmartScreen may say *“Windows protected your PC.”* Click **More info → Run anyway**.
 
-## You'll also need: a local AI model
+## You'll also need: a model
 
-ProseArc doesn't bundle an AI model — it connects to a **local** OpenAI‑compatible server on your own machine (that's why nothing leaves it). The easiest is **[LM Studio](https://lmstudio.ai/)**:
+ProseArc doesn't bundle an AI model — you point it at one. Two ways:
 
+**Local — private, free, offline.** Run a model on your own machine with **[LM Studio](https://lmstudio.ai/)**:
 1. Install LM Studio and **load** a chat/instruct model.
-2. Open the **Developer / Local Server** tab → **Start Server** (defaults to `http://localhost:1234`).
+2. Open **Developer / Local Server** → **Start Server** (defaults to `http://localhost:1234`).
+3. In ProseArc, keep the provider on **Local** and click **Test connection**.
 
-In ProseArc, use **Test connection** (Settings or Workspace) to confirm it's reachable.
+**Cloud — often higher quality, paid per use.** Use **OpenAI, OpenRouter, Gemini, or Claude**:
+1. Get an API key from the provider.
+2. In **Settings → API keys**, paste it under that provider.
+3. In the book's **Workspace**, set **Provider** to it and enter a **model id** (e.g. `gpt-4o-mini`, `claude-3-5-sonnet-latest`, `gemini-2.0-flash`, or an OpenRouter id like `openai/gpt-4o-mini`).
+
+> Cloud keys are stored only on your device — never in projects or exports. Local stays fully offline.
 
 ## Using ProseArc
 
@@ -79,9 +87,9 @@ MIT — see [LICENSE](LICENSE).
 
 # ProseArc — بالعربية
 
-**مساحة عمل لترجمة الروايات بإشراف بشري** باستخدام نموذج ذكاء اصطناعي محلي. استورد مخطوطة، ودع نموذجًا محليًا يُنتج ترجمة أولية، ثم راجِعها جنبًا إلى جنب، واقرأها ككتاب، وهذّبها — مع تحكّم كامل في الجودة والاتساق والأسلوب.
+**مساحة عمل لترجمة الروايات بإشراف بشري** باستخدام نموذج ذكاء اصطناعي **محلي أو سحابي**. استورد مخطوطة، ودع النموذج يُنتج ترجمة أولية، ثم راجِعها جنبًا إلى جنب، واقرأها ككتاب، وهذّبها — مع تحكّم كامل في الجودة والاتساق والأسلوب.
 
-> **الخصوصية أولًا.** كل طلب للذكاء الاصطناعي يذهب إلى خادم محلي متوافق مع OpenAI (LM Studio افتراضيًا). لا شيء يغادر جهازك.
+> **محلي افتراضيًا، وسحابي اختياريًا.** افتراضيًا، كل طلب يذهب إلى خادم *محلي* (LM Studio) — لا شيء يغادر جهازك. ويمكنك اختياريًا ربط مزوّد سحابي (OpenAI أو OpenRouter أو Gemini أو Claude)؛ عندها يُرسَل النص الذي تترجمه إلى ذلك المزوّد.
 
 مبني على Electron وHTML/CSS/JS عادي — دون إطار عمل للواجهة.
 
@@ -89,6 +97,7 @@ MIT — see [LICENSE](LICENSE).
 
 - **مكتبة المشاريع وصفحة لكل كتاب** — كل كتاب مشروع؛ افتحه لتظهر صفحته مع **قراءة / ترجمة / مراجعة / تصدير** والتقدّم في لمحة.
 - **استيراد واعٍ بالبنية** — استورد **TXT وMarkdown وEPUB وWord ‏(.docx)**. تُحفَظ العناوين والفقرات والاقتباسات والقوائم وفواصل المشاهد والتشكيل *المائل* / **العريض** خلال الترجمة وفي كل تصدير — دون تحويلها إلى نص متراصّ.
+- **نماذج محلية أو سحابية** — ترجم عبر خادم **محلي** (LM Studio أو أي خادم متوافق مع OpenAI) أو مزوّد **سحابي** (**OpenAI وOpenRouter وGemini وClaude**)؛ اختر لكل كتاب. تُخزَّن مفاتيح API على جهازك فقط.
 - **محرّك الترجمة** — يعرض التقدّم وسجلًا حيًّا؛ مهلة لكل طلب مع إعادة محاولة تلقائية؛ تشغيل قابل للاستئناف.
 - **أسلوب ترجمة لكل كتاب** — موجز اختياري (النبرة، الرسمية، الجمهور) يُرسَل مع كل مقطع.
 - **محرّر مراجعة بشاشة مقسّمة** — الأصل مقابل ترجمة قابلة للتحرير، **يدعم RTL** (مثل العربية)، متصفّح مُحسَّن لعشرات آلاف المقاطع، **تصفية حسب الحالة**، بحث مع **تظليل** للمطابقات، و**بحث واستبدال** في كل الترجمات.
@@ -109,14 +118,21 @@ MIT — see [LICENSE](LICENSE).
 
 > لأن التطبيق غير موقَّع رقميًا، قد يعرض ويندوز تحذير SmartScreen («حمى ويندوز جهازك»). اضغط **مزيد من المعلومات ← التشغيل على أي حال**.
 
-## ستحتاج أيضًا إلى نموذج ذكاء اصطناعي محلي
+## ستحتاج أيضًا إلى نموذج
 
-لا يتضمّن ProseArc نموذجًا — بل يتصل بخادم **محلي** متوافق مع OpenAI على جهازك (لذلك لا شيء يغادره). الأسهل هو **[LM Studio](https://lmstudio.ai/)**:
+لا يتضمّن ProseArc نموذجًا — أنت توجّهه إلى واحد. بطريقتين:
 
+**محلي — خاص ومجاني وبلا إنترنت.** شغّل نموذجًا على جهازك عبر **[LM Studio](https://lmstudio.ai/)**:
 1. ثبّت LM Studio و**حمّل** نموذج محادثة/تعليمات.
-2. افتح تبويب **Developer / Local Server** ← **Start Server** (الافتراضي `http://localhost:1234`).
+2. افتح **Developer / Local Server** ← **Start Server** (الافتراضي `http://localhost:1234`).
+3. في ProseArc، أبقِ المزوّد على **محلي** واضغط **اختبار الاتصال**.
 
-داخل ProseArc، استخدم زر **اختبار الاتصال** (في الإعدادات أو مساحة العمل) للتأكد.
+**سحابي — غالبًا أعلى جودة، مدفوع حسب الاستخدام.** استخدم **OpenAI أو OpenRouter أو Gemini أو Claude**:
+1. احصل على مفتاح API من المزوّد.
+2. في **الإعدادات ← مفاتيح API**، الصقه تحت ذلك المزوّد.
+3. في **مساحة عمل** الكتاب، اضبط **المزوّد** عليه وأدخل **معرّف النموذج** (مثل `gpt-4o-mini` أو `claude-3-5-sonnet-latest` أو `gemini-2.0-flash` أو معرّف OpenRouter مثل `openai/gpt-4o-mini`).
+
+> تُخزَّن مفاتيح السحابة على جهازك فقط — لا في المشاريع ولا في الملفات المصدَّرة. ويبقى المحلي بلا اتصال تمامًا.
 
 ## كيفية الاستخدام
 
