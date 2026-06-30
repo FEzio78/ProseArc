@@ -113,11 +113,11 @@
             <div class="field-row">
               <div class="field">
                 <label for="ws-source" data-i18n="f.source">Source language</label>
-                <input id="ws-source" type="text" />
+                <input id="ws-source" type="text" list="lang-list" />
               </div>
               <div class="field">
                 <label for="ws-target" data-i18n="f.target">Target language</label>
-                <input id="ws-target" type="text" />
+                <input id="ws-target" type="text" list="lang-list" />
               </div>
             </div>
             <div class="field">
@@ -357,11 +357,11 @@
           <div class="field-row">
             <div class="field">
               <label for="set-source" data-i18n="f.source">Source language</label>
-              <input id="set-source" type="text" />
+              <input id="set-source" type="text" list="lang-list" />
             </div>
             <div class="field">
               <label for="set-target" data-i18n="f.target">Target language</label>
-              <input id="set-target" type="text" />
+              <input id="set-target" type="text" list="lang-list" />
             </div>
           </div>
           <div class="field">
@@ -476,11 +476,11 @@
       <div class="field-row">
         <div class="field">
           <label for="np-source" data-i18n="f.source">Source language</label>
-          <input id="np-source" type="text" value="English" />
+          <input id="np-source" type="text" value="English" list="lang-list" />
         </div>
         <div class="field">
           <label for="np-target" data-i18n="f.target">Target language</label>
-          <input id="np-target" type="text" value="Arabic" />
+          <input id="np-target" type="text" value="Arabic" list="lang-list" />
         </div>
       </div>
 
@@ -567,6 +567,38 @@
   </div>
 
   <div class="toast" id="toast"></div>
+
+  <!-- Shared language suggestions for all source/target fields (still typeable). -->
+  <datalist id="lang-list">
+    <option value="English"></option>
+    <option value="Arabic"></option>
+    <option value="Afrikaans"></option>
+    <option value="Chinese"></option>
+    <option value="Czech"></option>
+    <option value="Dutch"></option>
+    <option value="Filipino"></option>
+    <option value="Finnish"></option>
+    <option value="French"></option>
+    <option value="German"></option>
+    <option value="Greek"></option>
+    <option value="Indonesian"></option>
+    <option value="Italian"></option>
+    <option value="Japanese"></option>
+    <option value="Korean"></option>
+    <option value="Polish"></option>
+    <option value="Portuguese"></option>
+    <option value="Russian"></option>
+    <option value="Serbian"></option>
+    <option value="Sinhala"></option>
+    <option value="Slovak"></option>
+    <option value="Spanish"></option>
+    <option value="Swahili"></option>
+    <option value="Swedish"></option>
+    <option value="Tamil"></option>
+    <option value="Telugu"></option>
+    <option value="Thai"></option>
+    <option value="Turkish"></option>
+  </datalist>
 
   <script src="i18n.js"></script>
   <script src="renderer.js"></script>

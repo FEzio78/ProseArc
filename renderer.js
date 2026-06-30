@@ -1329,6 +1329,18 @@ $('#set-test').addEventListener('click', () => runConnectionTest($('#set-url').v
 $('#set-theme').addEventListener('change', (e) => applyTheme(e.target.value));
 $('#set-lang').addEventListener('change', (e) => setLang(e.target.value));
 
+// Language fields use a <datalist>, which Chromium filters by the current value.
+// Clear on focus so the whole list shows; restore the previous value if the user
+// clicks away without choosing one.
+['#np-source', '#np-target', '#ws-source', '#ws-target', '#set-source', '#set-target']
+  .forEach((sel) => {
+    const el = $(sel);
+    if (!el) return;
+    let prevLang = '';
+    el.addEventListener('focus', () => { prevLang = el.value; el.value = ''; });
+    el.addEventListener('blur', () => { if (!el.value.trim()) el.value = prevLang; });
+  });
+
 // ============================================================================
 //  Reader — read the finished translation as a book
 // ============================================================================
