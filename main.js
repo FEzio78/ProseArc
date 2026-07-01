@@ -13,6 +13,7 @@ const { createEngine } = require('./src/engine');
 const { buildExport, buildHtmlDocument, buildEpub } = require('./src/exporter');
 const { epubToBlocks } = require('./src/epub');
 const { docxToBlocks } = require('./src/docx');
+const { pdfToBlocks } = require('./src/pdf');
 const os = require('os');
 
 let store;  // initialised once the app is ready and userData path is known.
@@ -80,7 +81,7 @@ function registerIpc() {
   // Open a native file picker and read the chosen manuscript.
   // Returns one of:
   //   { fileName, text }            — plain txt/Markdown
-  //   { fileName, blocks, title }   — structured import (EPUB/DOCX)
+  //   { fileName, blocks, title }   — structured import (EPUB/DOCX/PDF)
   //   { fileName, error }           — parse failed
   //   null                          — the user cancelled
   ipcMain.handle('manuscript:pick', async (e) => {
@@ -89,10 +90,11 @@ function registerIpc() {
       title: 'Choose a manuscript',
       properties: ['openFile'],
       filters: [
-        { name: 'Books & manuscripts', extensions: ['txt', 'md', 'markdown', 'epub', 'docx'] },
+        { name: 'Books & manuscripts', extensions: ['txt', 'md', 'markdown', 'epub', 'docx', 'pdf'] },
         { name: 'Text & Markdown', extensions: ['txt', 'md', 'markdown'] },
         { name: 'EPUB', extensions: ['epub'] },
         { name: 'Word', extensions: ['docx'] },
+        { name: 'PDF', extensions: ['pdf'] },
         { name: 'All files', extensions: ['*'] },
       ],
     });
@@ -110,6 +112,10 @@ function registerIpc() {
       }
       if (ext === '.docx') {
         const { title, blocks } = await docxToBlocks(await fsp.readFile(filePath));
+        return { fileName, blocks, title };
+      }
+      if (ext === '.pdf') {
+        const { title, blocks } = await pdfToBlocks(await fsp.readFile(filePath));
         return { fileName, blocks, title };
       }
       // txt / md / markdown / anything else: read as UTF-8 text.

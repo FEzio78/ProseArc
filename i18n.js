@@ -94,7 +94,7 @@ const I18N = {
 
     'np.title': 'New Project', 'np.sub': 'Import a manuscript and set up its translation.',
     'np.file': 'Manuscript file', 'np.noFile': 'No file chosen', 'np.choose': 'Choose…',
-    'np.fileHint': 'TXT, Markdown, EPUB, or Word (.docx). Structure is preserved.',
+    'np.fileHint': 'TXT, Markdown, EPUB, Word (.docx), or PDF. Structure is preserved.',
     'np.name': 'Project name', 'np.namePh': 'e.g. The Shadow Blade',
     'np.cancel': 'Cancel', 'np.create': 'Create Project',
 
@@ -245,7 +245,7 @@ const I18N = {
 
     'np.title': 'مشروع جديد', 'np.sub': 'استورد مخطوطة وأعدّ ترجمتها.',
     'np.file': 'ملف المخطوطة', 'np.noFile': 'لم يُختَر ملف', 'np.choose': 'اختيار…',
-    'np.fileHint': 'TXT أو Markdown أو EPUB أو Word‏ (.docx). تُحفَظ البنية.',
+    'np.fileHint': 'TXT أو Markdown أو EPUB أو Word‏ (.docx) أو PDF. تُحفَظ البنية.',
     'np.name': 'اسم المشروع', 'np.namePh': 'مثل: سيف الظل',
     'np.cancel': 'إلغاء', 'np.create': 'إنشاء المشروع',
 

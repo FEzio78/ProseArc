@@ -122,4 +122,4 @@ function htmlToBlocks(html) {
   return blocks;
 }
 
-module.exports = { htmlToBlocks };
+module.exports = { htmlToBlocks, isSceneText };
