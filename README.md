@@ -22,7 +22,7 @@ Built with Electron + plain HTML/CSS/JS — no UI framework.
 ## Features
 
 - **Project library & per‑book hub** — each book is one project; open it to a page with **Read / Translate / Review / Export** and progress at a glance.
-- **Structure‑aware import** — import **TXT, Markdown, EPUB, or Word (.docx)**. Headings, paragraphs, block quotes, lists, scene breaks, and *italic* / **bold** emphasis are preserved through translation and back out to every export — not flattened into a wall of text.
+- **Structure‑aware import** — import **TXT, Markdown, EPUB, Word (.docx), or PDF**. Headings, paragraphs, block quotes, lists, scene breaks, and *italic* / **bold** emphasis are preserved through translation and back out to every export — not flattened into a wall of text. PDF structure is reconstructed heuristically (headings, paragraphs, emphasis; running headers and page numbers are stripped); scanned/image‑only PDFs are not supported.
 - **Local or cloud models** — translate with a **local** server (LM Studio, or any OpenAI‑compatible) *or* a **cloud** provider (**OpenAI, OpenRouter, Gemini, Claude**); choose per book. API keys are stored only on your device.
 - **Translation engine** — streams progress and a live activity log; per‑request timeout + auto‑retry; resumable runs.
 - **Per‑book translation style** — an optional brief (tone, formality, audience) sent with every segment.
@@ -64,7 +64,7 @@ ProseArc doesn't bundle an AI model — you point it at one. Two ways:
 
 ## Using ProseArc
 
-Create a project and import a `.txt`, `.md`, `.epub`, or `.docx`. Set the source/target languages, then press **Start translating** (with your local server running). Polish in **Review**, **Read** the result as a book, and **Export** to TXT / Markdown / PDF / EPUB. Set defaults once in **Settings**.
+Create a project and import a `.txt`, `.md`, `.epub`, `.docx`, or `.pdf`. Set the source/target languages, then press **Start translating** (with your local server running). Polish in **Review**, **Read** the result as a book, and **Export** to TXT / Markdown / PDF / EPUB. Set defaults once in **Settings**.
 
 ---
 
@@ -110,7 +110,7 @@ MIT — see [LICENSE](LICENSE).
 ## المزايا
 
 - **مكتبة المشاريع وصفحة لكل كتاب** — كل كتاب مشروع؛ افتحه لتظهر صفحته مع **قراءة / ترجمة / مراجعة / تصدير** والتقدّم في لمحة.
-- **استيراد واعٍ بالبنية** — استورد **TXT وMarkdown وEPUB وWord ‏(.docx)**. تُحفَظ العناوين والفقرات والاقتباسات والقوائم وفواصل المشاهد والتشكيل *المائل* / **العريض** خلال الترجمة وفي كل تصدير — دون تحويلها إلى نص متراصّ.
+- **استيراد واعٍ بالبنية** — استورد **TXT وMarkdown وEPUB وWord ‏(.docx) وPDF**. تُحفَظ العناوين والفقرات والاقتباسات والقوائم وفواصل المشاهد والتشكيل *المائل* / **العريض** خلال الترجمة وفي كل تصدير — دون تحويلها إلى نص متراصّ. تُستعاد بنية PDF بطرق استدلالية (العناوين والفقرات والتشكيل، مع إزالة الترويسات وأرقام الصفحات)؛ ملفات PDF الممسوحة ضوئيًا (صور فقط) غير مدعومة.
 - **نماذج محلية أو سحابية** — ترجم عبر خادم **محلي** (LM Studio أو أي خادم متوافق مع OpenAI) أو مزوّد **سحابي** (**OpenAI وOpenRouter وGemini وClaude**)؛ اختر لكل كتاب. تُخزَّن مفاتيح API على جهازك فقط.
 - **محرّك الترجمة** — يعرض التقدّم وسجلًا حيًّا؛ مهلة لكل طلب مع إعادة محاولة تلقائية؛ تشغيل قابل للاستئناف.
 - **أسلوب ترجمة لكل كتاب** — موجز اختياري (النبرة، الرسمية، الجمهور) يُرسَل مع كل مقطع.
@@ -150,7 +150,7 @@ MIT — see [LICENSE](LICENSE).
 
 ## كيفية الاستخدام
 
-أنشئ مشروعًا واستورد ملف `.txt` أو `.md` أو `.epub` أو `.docx`. اضبط لغتي المصدر والهدف، ثم اضغط **بدء الترجمة** (مع تشغيل الخادم المحلي). هذّب في **المراجعة**، و**اقرأ** النتيجة ككتاب، و**صدّر** إلى TXT / Markdown / PDF / EPUB. اضبط الافتراضيات مرة واحدة في **الإعدادات**.
+أنشئ مشروعًا واستورد ملف `.txt` أو `.md` أو `.epub` أو `.docx` أو `.pdf`. اضبط لغتي المصدر والهدف، ثم اضغط **بدء الترجمة** (مع تشغيل الخادم المحلي). هذّب في **المراجعة**، و**اقرأ** النتيجة ككتاب، و**صدّر** إلى TXT / Markdown / PDF / EPUB. اضبط الافتراضيات مرة واحدة في **الإعدادات**.
 
 ## البناء من المصدر
 
