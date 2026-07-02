@@ -53,8 +53,10 @@
       "artifactName": "ProseArc-${version}-portable.exe"
     },
     "nsis": {
-      "oneClick": true,
+      "oneClick": false,
       "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "license": "LICENSE",
       "shortcutName": "ProseArc",
       "artifactName": "ProseArc-Setup-${version}.exe"
     }
