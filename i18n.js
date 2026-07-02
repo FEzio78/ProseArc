@@ -95,6 +95,9 @@ const I18N = {
     'np.title': 'New Project', 'np.sub': 'Import a manuscript and set up its translation.',
     'np.file': 'Manuscript file', 'np.noFile': 'No file chosen', 'np.choose': 'Choose…',
     'np.fileHint': 'TXT, Markdown, EPUB, Word (.docx), or PDF. Structure is preserved.',
+    'hub.cover': 'Cover…', 'hub.coverRemove': 'Remove cover',
+    'rn.title': 'Rename book', 'rn.save': 'Save',
+    'toast.coverError': 'Could not read that image.',
     'np.name': 'Project name', 'np.namePh': 'e.g. The Shadow Blade',
     'np.cancel': 'Cancel', 'np.create': 'Create Project',
 
@@ -246,6 +249,9 @@ const I18N = {
     'np.title': 'مشروع جديد', 'np.sub': 'استورد مخطوطة وأعدّ ترجمتها.',
     'np.file': 'ملف المخطوطة', 'np.noFile': 'لم يُختَر ملف', 'np.choose': 'اختيار…',
     'np.fileHint': 'TXT أو Markdown أو EPUB أو Word‏ (.docx) أو PDF. تُحفَظ البنية.',
+    'hub.cover': 'الغلاف…', 'hub.coverRemove': 'إزالة الغلاف',
+    'rn.title': 'إعادة تسمية الكتاب', 'rn.save': 'حفظ',
+    'toast.coverError': 'تعذّرت قراءة هذه الصورة.',
     'np.name': 'اسم المشروع', 'np.namePh': 'مثل: سيف الظل',
     'np.cancel': 'إلغاء', 'np.create': 'إنشاء المشروع',
 

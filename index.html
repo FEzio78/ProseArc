@@ -68,6 +68,8 @@
           </div>
           <div class="hub-meta-actions">
             <button class="btn btn-ghost btn-sm" id="hub-rename" data-i18n="hub.rename">Rename</button>
+            <button class="btn btn-ghost btn-sm" id="hub-cover-btn" data-i18n="hub.cover">Cover…</button>
+            <button class="btn btn-ghost btn-sm" id="hub-cover-remove" data-i18n="hub.coverRemove" hidden>Remove cover</button>
             <button class="btn btn-danger btn-sm" id="hub-delete" data-i18n="card.delete">Delete</button>
           </div>
         </div>
@@ -487,6 +489,20 @@
       <div class="modal-actions">
         <button class="btn btn-ghost" id="np-cancel" data-i18n="np.cancel">Cancel</button>
         <button class="btn btn-primary" id="np-create" disabled data-i18n="np.create">Create Project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename modal (window.prompt is unavailable in Electron) -->
+  <div class="modal-backdrop" id="rename-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rn-title">
+      <h2 id="rn-title" data-i18n="rn.title">Rename book</h2>
+      <div class="field">
+        <input type="text" id="rn-input" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="rn-cancel" data-i18n="np.cancel">Cancel</button>
+        <button class="btn btn-primary" id="rn-save" data-i18n="rn.save">Save</button>
       </div>
     </div>
   </div>

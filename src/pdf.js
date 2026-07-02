@@ -8,6 +8,8 @@
 // are dropped. Inline emphasis is detected from font names (…-Italic,
 // …-Bold) and emitted as Markdown, matching the other importers.
 
+const path = require('path');
+const { pathToFileURL } = require('url');
 const { isSceneText } = require('./html-to-blocks');
 
 // pdfjs-dist v4+ ships ESM only; load it once via dynamic import from CJS.
@@ -282,4 +284,46 @@ async function pdfToBlocks(buffer) {
   return { title, blocks };
 }
 
-module.exports = { pdfToBlocks };
+/**
+ * Render the first page to a PNG buffer, for use as a project cover.
+ * Uses pdf.js' Node canvas support (@napi-rs/canvas). Best-effort: returns
+ * null on any failure rather than blocking the import.
+ * @param {Buffer} buffer
+ * @param {number} [targetWidth]
+ * @returns {Promise<Buffer|null>}
+ */
+async function pdfCover(buffer, targetWidth = 600) {
+  let loadingTask = null;
+  try {
+    const pdfjs = await loadPdfjs();
+    // Standard-14 fonts (Times, Helvetica…) for PDFs that don't embed theirs.
+    const fontsDir = pathToFileURL(
+      path.join(path.dirname(require.resolve('pdfjs-dist/package.json')), 'standard_fonts') + path.sep
+    ).href;
+    loadingTask = pdfjs.getDocument({
+      data: new Uint8Array(buffer),
+      useSystemFonts: true,
+      isEvalSupported: false,
+      verbosity: 0,
+      standardFontDataUrl: fontsDir,
+    });
+    const doc = await loadingTask.promise;
+    const page = await doc.getPage(1);
+    const scale = targetWidth / page.getViewport({ scale: 1 }).width;
+    const viewport = page.getViewport({ scale });
+    const w = Math.round(viewport.width);
+    const h = Math.round(viewport.height);
+    const { canvas, context } = doc.canvasFactory.create(w, h);
+    context.fillStyle = '#ffffff'; // PDF pages are white unless drawn otherwise
+    context.fillRect(0, 0, w, h);
+    await page.render({ canvasContext: context, viewport }).promise;
+    const png = canvas.toBuffer('image/png');
+    await loadingTask.destroy();
+    return png;
+  } catch {
+    if (loadingTask) try { await loadingTask.destroy(); } catch { /* already gone */ }
+    return null;
+  }
+}
+
+module.exports = { pdfToBlocks, pdfCover };

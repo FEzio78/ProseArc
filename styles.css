@@ -260,6 +260,13 @@ body, .sidebar, .panel, .navigator, .editor, .project-card, .modal, .nav-item {
   gap: 14px;
 }
 .project-card:hover { transform: translateY(-2px); border-color: var(--accent-soft); background: var(--surface-2); }
+.card-cover {
+  height: 150px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; margin-bottom: 4px;
+}
+.card-cover span { font-family: var(--font-serif); font-size: 2.4rem; color: rgba(255, 255, 255, 0.92); }
+.card-cover img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
 .project-card h3 {
   font-family: var(--font-serif);
   font-size: 1.15rem;
@@ -957,6 +964,11 @@ textarea.pane-body {
   background: var(--accent); border-radius: 8px 8px 0 0;
 }
 .hub-cover span { font-family: var(--font-serif); font-size: 3rem; color: rgba(255, 255, 255, 0.92); }
+.hub-cover img {
+  width: 100%; height: 100%; object-fit: cover;
+  border-radius: 8px; display: block;
+}
+.hub-cover:has(img)::before { display: none; } /* no accent strip over real art */
 .hub-info { flex: 1; min-width: 0; }
 .hub-info h1 { font-family: var(--font-serif); font-size: 1.6rem; margin: 0 0 6px; }
 .hub-langs { color: var(--muted); font-size: 0.9rem; margin-bottom: 18px; }

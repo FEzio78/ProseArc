@@ -73,8 +73,12 @@ async function renderLibrary() {
 function cardHtml(p) {
   const { total, translated, reviewed } = p.counts;
   const pct = total ? Math.round((translated / total) * 100) : 0;
+  const cover = p.coverUrl
+    ? `<div class="card-cover"><img src="${p.coverUrl}" alt="" /></div>`
+    : `<div class="card-cover" style="background:${coverColor(p.name)}"><span>${escapeHtml((p.name || '?').trim()[0] || '?')}</span></div>`;
   return `
     <div class="project-card" data-id="${p.id}" tabindex="0">
+      ${cover}
       <div>
         <h3>${escapeHtml(p.name)}</h3>
         <div class="langs">${escapeHtml(p.sourceLang)} → ${escapeHtml(p.targetLang)}</div>
@@ -176,21 +180,53 @@ function renderHub() {
   const pct = c.total ? Math.round((c.translated / c.total) * 100) : 0;
   $('#hub-title').textContent = p.name;
   $('#hub-langs').textContent = `${p.sourceLang} → ${p.targetLang}`;
-  $('#hub-cover').style.background = coverColor(p.name);
-  $('#hub-initial').textContent = (p.name || '?').trim()[0] || '?';
+  const cover = $('#hub-cover');
+  if (p.coverUrl) {
+    cover.style.background = 'none';
+    cover.innerHTML = `<img src="${p.coverUrl}" alt="" />`;
+  } else {
+    cover.style.background = coverColor(p.name);
+    cover.innerHTML = `<span id="hub-initial">${escapeHtml((p.name || '?').trim()[0] || '?')}</span>`;
+  }
+  $('#hub-cover-remove').hidden = !p.coverUrl;
   $('#hub-bar-fill').style.width = `${pct}%`;
   $('#hub-counts').textContent = t('stats', { t: c.translated, n: c.total, r: c.reviewed });
 }
-async function renameCurrentBook() {
+
+// Rename runs through an in-app modal: window.prompt() is not supported in
+// Electron renderers (it silently does nothing).
+function openRenameModal() {
   if (!currentProject) return;
-  const name = prompt(t('hub.renamePrompt'), currentProject.name);
-  if (name == null) return;
-  const clean = name.trim();
-  if (!clean) return;
+  $('#rn-input').value = currentProject.name;
+  $('#rename-modal').classList.add('open');
+  $('#rn-input').focus();
+  $('#rn-input').select();
+}
+function closeRenameModal() { $('#rename-modal').classList.remove('open'); }
+async function saveRename() {
+  if (!currentProject) return;
+  const clean = $('#rn-input').value.trim();
+  closeRenameModal();
+  if (!clean || clean === currentProject.name) return;
   currentProject.name = clean;
   $('#ws-name').value = clean;
   $('#ws-title').textContent = clean;
   await window.api.saveProject(currentProject);
+  renderHub();
+}
+
+async function changeCover() {
+  if (!currentProject) return;
+  const res = await window.api.pickCover(currentProject.id);
+  if (!res) return; // user cancelled the picker
+  if (res.error) { toast(t('toast.coverError')); return; }
+  currentProject.coverUrl = res.coverUrl;
+  renderHub();
+}
+async function removeCover() {
+  if (!currentProject) return;
+  await window.api.removeCover(currentProject.id);
+  currentProject.coverUrl = null;
   renderHub();
 }
 async function deleteCurrentBook() {
@@ -208,8 +244,18 @@ $('#hub-translate').addEventListener('click', () => showView('workspace'));
 $('#hub-review').addEventListener('click', () => showView('review'));
 $('#hub-export').addEventListener('click', () => openExportModal());
 $('#hub-back').addEventListener('click', () => { showView('library'); renderLibrary(); });
-$('#hub-rename').addEventListener('click', renameCurrentBook);
+$('#hub-rename').addEventListener('click', openRenameModal);
+$('#hub-cover-btn').addEventListener('click', changeCover);
+$('#hub-cover-remove').addEventListener('click', removeCover);
 $('#hub-delete').addEventListener('click', deleteCurrentBook);
+$('#rn-save').addEventListener('click', saveRename);
+$('#rn-cancel').addEventListener('click', closeRenameModal);
+$('#rn-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') saveRename();
+});
+$('#rename-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'rename-modal') closeRenameModal(); // click backdrop to close
+});
 
 // Auto-save settings whenever a field changes.
 async function saveSettings() {
@@ -468,7 +514,8 @@ async function createProject() {
   const input = {
     name: $('#np-name').value,
     text: pickedManuscript.text,     // for txt/md
-    blocks: pickedManuscript.blocks, // for EPUB/DOCX (store picks whichever is set)
+    blocks: pickedManuscript.blocks, // for EPUB/DOCX/PDF (store picks whichever is set)
+    cover: pickedManuscript.cover,   // base64 image extracted by the importer, if any
     settings: {
       sourceLang: $('#np-source').value.trim() || 'Source',
       targetLang: $('#np-target').value.trim() || 'Target',
@@ -491,7 +538,7 @@ $('#new-project-modal').addEventListener('click', (e) => {
   if (e.target.id === 'new-project-modal') closeNewProjectModal(); // click backdrop to close
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closeNewProjectModal(); closeRetransModal(); closeExportModal(); closeFrModal(); }
+  if (e.key === 'Escape') { closeNewProjectModal(); closeRetransModal(); closeExportModal(); closeFrModal(); closeRenameModal(); }
 });
 
 // ============================================================================

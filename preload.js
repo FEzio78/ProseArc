@@ -24,6 +24,10 @@ contextBridge.exposeInMainWorld('api', {
   saveSecrets: (secrets) => ipcRenderer.invoke('secrets:save', secrets),
   deleteProject: (id) => ipcRenderer.invoke('projects:delete', id),
 
+  // Covers (native image picker; remove clears the stored cover file).
+  pickCover: (projectId) => ipcRenderer.invoke('cover:pick', projectId),
+  removeCover: (projectId) => ipcRenderer.invoke('cover:remove', projectId),
+
   // Manuscript import (opens a native file picker, returns { fileName, text }).
   pickManuscript: () => ipcRenderer.invoke('manuscript:pick'),
 

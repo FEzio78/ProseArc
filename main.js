@@ -3,8 +3,9 @@
 // over IPC (inter-process communication). The renderer can't touch the disk
 // directly; it calls these handlers through the preload bridge.
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, nativeImage } = require('electron');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const fsp = require('fs/promises');
 const fs = require('fs');
 
@@ -13,7 +14,7 @@ const { createEngine } = require('./src/engine');
 const { buildExport, buildHtmlDocument, buildEpub } = require('./src/exporter');
 const { epubToBlocks } = require('./src/epub');
 const { docxToBlocks } = require('./src/docx');
-const { pdfToBlocks } = require('./src/pdf');
+const { pdfToBlocks, pdfCover } = require('./src/pdf');
 const os = require('os');
 
 let store;  // initialised once the app is ready and userData path is known.
@@ -58,15 +59,80 @@ async function writePdf(html, filePath) {
   }
 }
 
+// ---- Covers -----------------------------------------------------------------
+
+// Normalize any picked/extracted image into a modest JPEG (≤600px wide) so
+// covers stay small on disk no matter what the source was. Returns null if
+// the bytes aren't a decodable image.
+function normalizeCoverJpeg(buffer) {
+  const img = nativeImage.createFromBuffer(buffer);
+  if (img.isEmpty()) return null;
+  const { width } = img.getSize();
+  const scaled = width > 600 ? img.resize({ width: 600 }) : img;
+  return scaled.toJPEG(88);
+}
+
+// file:// URL for a project's cover (mtime query busts the renderer's cache
+// after a change), or null when the project has none.
+function coverUrlFor(id) {
+  const p = store.getCoverPath(id);
+  if (!p) return null;
+  try { return pathToFileURL(p).href + '?v=' + fs.statSync(p).mtimeMs; }
+  catch { return null; }
+}
+
 // ---- IPC handlers -----------------------------------------------------------
 // Each handler is async and returns a value (or throws) back to the renderer.
 
 function registerIpc() {
-  ipcMain.handle('projects:list', () => store.listProjects());
-  ipcMain.handle('projects:get', (_e, id) => store.getProject(id));
+  ipcMain.handle('projects:list', async () => {
+    const projects = await store.listProjects();
+    return projects.map((p) => ({ ...p, coverUrl: coverUrlFor(p.id) }));
+  });
+  ipcMain.handle('projects:get', async (_e, id) => {
+    const project = await store.getProject(id);
+    project.coverUrl = coverUrlFor(id);
+    return project;
+  });
   ipcMain.handle('projects:delete', (_e, id) => store.deleteProject(id));
-  ipcMain.handle('projects:create', (_e, input) => store.createProject(input));
-  ipcMain.handle('projects:save', (_e, project) => store.saveProject(project));
+  ipcMain.handle('projects:create', async (_e, input) => {
+    const project = await store.createProject(input);
+    if (input.cover) {
+      try {
+        const jpeg = normalizeCoverJpeg(Buffer.from(input.cover, 'base64'));
+        if (jpeg) await store.saveCover(project.id, jpeg);
+      } catch { /* a bad cover never blocks project creation */ }
+    }
+    project.coverUrl = coverUrlFor(project.id);
+    return project;
+  });
+  ipcMain.handle('projects:save', (_e, project) => {
+    delete project.coverUrl; // display-only field; not part of the stored JSON
+    return store.saveProject(project);
+  });
+
+  // Set or clear a project's cover image.
+  ipcMain.handle('cover:pick', async (e, projectId) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const result = await dialog.showOpenDialog(win, {
+      title: 'Choose a cover image',
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp'] }],
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    try {
+      const jpeg = normalizeCoverJpeg(await fsp.readFile(result.filePaths[0]));
+      if (!jpeg) return { error: 'unsupported' };
+      await store.saveCover(projectId, jpeg);
+      return { coverUrl: coverUrlFor(projectId) };
+    } catch (err) {
+      return { error: err.message || String(err) };
+    }
+  });
+  ipcMain.handle('cover:remove', async (_e, projectId) => {
+    await store.deleteCover(projectId);
+    return true;
+  });
   ipcMain.handle('projects:updateSegment', (_e, { projectId, segmentId, fields }) =>
     store.updateSegment(projectId, segmentId, fields));
   ipcMain.handle('projects:saveGlossary', (_e, { projectId, glossary }) =>
@@ -107,16 +173,20 @@ function registerIpc() {
 
     try {
       if (ext === '.epub') {
-        const { title, blocks } = await epubToBlocks(await fsp.readFile(filePath));
-        return { fileName, blocks, title };
+        const buf = await fsp.readFile(filePath);
+        const { title, blocks, cover } = await epubToBlocks(buf);
+        return { fileName, blocks, title, cover };
       }
       if (ext === '.docx') {
         const { title, blocks } = await docxToBlocks(await fsp.readFile(filePath));
         return { fileName, blocks, title };
       }
       if (ext === '.pdf') {
-        const { title, blocks } = await pdfToBlocks(await fsp.readFile(filePath));
-        return { fileName, blocks, title };
+        const buf = await fsp.readFile(filePath);
+        const { title, blocks } = await pdfToBlocks(buf);
+        // First page as the cover — usually the actual cover art in book PDFs.
+        const png = await pdfCover(buf);
+        return { fileName, blocks, title, cover: png ? png.toString('base64') : null };
       }
       // txt / md / markdown / anything else: read as UTF-8 text.
       const text = await fsp.readFile(filePath, 'utf8');
@@ -153,7 +223,9 @@ function registerIpc() {
     if (fmt.ext === 'pdf') {
       await writePdf(buildHtmlDocument(project), result.filePath);
     } else if (fmt.ext === 'epub') {
-      await fsp.writeFile(result.filePath, await buildEpub(project));
+      const coverPath = store.getCoverPath(projectId);
+      const cover = coverPath ? await fsp.readFile(coverPath) : null;
+      await fsp.writeFile(result.filePath, await buildEpub(project, cover));
     } else {
       await fsp.writeFile(result.filePath, text, 'utf8'); // txt, md
     }
@@ -202,6 +274,16 @@ app.whenReady().then(() => {
 
   registerIpc();
   createWindow();
+
+  // Auto-update from GitHub releases (installed builds only — the portable
+  // exe has no install location to update, and dev runs aren't packaged).
+  if (app.isPackaged && !process.env.PORTABLE_EXECUTABLE_DIR) {
+    try {
+      const { autoUpdater } = require('electron-updater');
+      autoUpdater.on('error', () => {}); // being offline is normal; stay quiet
+      autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+    } catch { /* updater unavailable — never block app start */ }
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
