@@ -149,8 +149,12 @@ function buildHtmlDocument(project) {
 </html>`;
 }
 
-/** Build an EPUB 3 file as a Buffer. */
-async function buildEpub(project) {
+/**
+ * Build an EPUB 3 file as a Buffer.
+ * @param {object} project
+ * @param {Buffer|null} [cover] - optional JPEG cover image to embed.
+ */
+async function buildEpub(project, cover = null) {
   const JSZip = require('jszip');
   const rtl = isRtl(project.targetLang);
   const lang = rtl ? 'ar' : 'en';
@@ -174,16 +178,26 @@ async function buildEpub(project) {
     <dc:identifier id="bookid">urn:uuid:${uuid}</dc:identifier>
     <dc:title>${title}</dc:title>
     <dc:language>${lang}</dc:language>
-    <meta property="dcterms:modified">${modified}</meta>
+    <meta property="dcterms:modified">${modified}</meta>${cover ? '\n    <meta name="cover" content="cover-img"/>' : ''}
   </metadata>
   <manifest>
-    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>${cover ? `
+    <item id="cover-img" href="cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+    <item id="coverpage" href="cover.xhtml" media-type="application/xhtml+xml"/>` : ''}
     <item id="content" href="content.xhtml" media-type="application/xhtml+xml"/>
   </manifest>
-  <spine page-progression-direction="${dir}">
+  <spine page-progression-direction="${dir}">${cover ? '\n    <itemref idref="coverpage"/>' : ''}
     <itemref idref="content"/>
   </spine>
 </package>`;
+
+  const coverXhtml = `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${lang}" dir="${dir}">
+<head><meta charset="utf-8"/><title>${title}</title>
+<style> body { margin: 0; text-align: center; } img { max-width: 100%; max-height: 100%; } </style>
+</head>
+<body epub:type="cover" xmlns:epub="http://www.idpf.org/2007/ops"><img src="cover.jpg" alt="${title}"/></body>
+</html>`;
 
   const navXhtml = `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${lang}" dir="${dir}">
@@ -220,6 +234,10 @@ async function buildEpub(project) {
   zip.file('OEBPS/content.opf', contentOpf);
   zip.file('OEBPS/nav.xhtml', navXhtml);
   zip.file('OEBPS/content.xhtml', contentXhtml);
+  if (cover) {
+    zip.file('OEBPS/cover.jpg', cover);
+    zip.file('OEBPS/cover.xhtml', coverXhtml);
+  }
 
   return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
 }

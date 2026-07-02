@@ -33,6 +33,11 @@ function createStore(projectsDir) {
 
   const filePath = (id) => path.join(projectsDir, `${id}.json`);
 
+  // Covers live beside the projects folder, one JPEG per project.
+  const coversDir = path.join(path.dirname(projectsDir), 'covers');
+  fs.mkdirSync(coversDir, { recursive: true });
+  const coverFile = (id) => path.join(coversDir, `${id}.jpg`);
+
   // The shared dictionary lives beside the projects folder (one per install).
   const globalGlossaryPath = path.join(path.dirname(projectsDir), 'glossary-global.json');
 
@@ -275,13 +280,34 @@ function createStore(projectsDir) {
     return clean;
   }
 
-  /** Delete a project file. Resolves even if it was already gone. */
+  /** Save a project's cover image (a normalized JPEG buffer). */
+  async function saveCover(id, jpegBuffer) {
+    await fsp.writeFile(coverFile(id), jpegBuffer);
+    return coverFile(id);
+  }
+
+  /** Absolute path of a project's cover, or null if it has none. */
+  function getCoverPath(id) {
+    return fs.existsSync(coverFile(id)) ? coverFile(id) : null;
+  }
+
+  /** Remove a project's cover. Resolves even if it was already gone. */
+  async function deleteCover(id) {
+    try {
+      await fsp.unlink(coverFile(id));
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err;
+    }
+  }
+
+  /** Delete a project file (and its cover). Resolves even if already gone. */
   async function deleteProject(id) {
     try {
       await fsp.unlink(filePath(id));
     } catch (err) {
       if (err.code !== 'ENOENT') throw err;
     }
+    await deleteCover(id);
   }
 
   return {
@@ -300,6 +326,9 @@ function createStore(projectsDir) {
     getSecrets,
     saveSecrets,
     deleteProject,
+    saveCover,
+    getCoverPath,
+    deleteCover,
     countStatuses,
     _atomicWrite: atomicWrite, // exposed for engine use later
   };

@@ -39,7 +39,8 @@ function attr(tag, name) {
 }
 
 /**
- * Parse an EPUB buffer into { title, blocks }.
+ * Parse an EPUB buffer into { title, blocks, cover } (cover: base64 image
+ * bytes of the book's cover art, or null when the EPUB has none).
  * @param {Buffer|Uint8Array} buffer
  */
 async function epubToBlocks(buffer) {
@@ -73,6 +74,35 @@ async function epubToBlocks(buffer) {
   const title = (opf.match(/<dc:title[^>]*>([\s\S]*?)<\/dc:title>/i)?.[1] || '')
     .replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 
+  // Cover image (best-effort): EPUB 3 properties="cover-image", then the
+  // EPUB 2 <meta name="cover"> pointer, then a filename that looks like one.
+  let cover = null;
+  try {
+    let coverItem = null;
+    for (const m of opf.matchAll(/<item\b[^>]*>/gi)) {
+      const props = attr(m[0], 'properties') || '';
+      if (/\bcover-image\b/i.test(props)) {
+        coverItem = { href: attr(m[0], 'href'), media: attr(m[0], 'media-type') || '' };
+        break;
+      }
+    }
+    if (!coverItem) {
+      const metaTag = opf.match(/<meta\b[^>]*name\s*=\s*["']cover["'][^>]*>/i)?.[0];
+      const coverId = metaTag && attr(metaTag, 'content');
+      if (coverId && manifest[coverId]) coverItem = manifest[coverId];
+    }
+    if (!coverItem) {
+      coverItem = Object.values(manifest).find(
+        (it) => /^image\//i.test(it.media) && /cover/i.test(it.href)
+      ) || null;
+    }
+    if (coverItem && coverItem.href) {
+      const zipPath = resolvePath(baseDir, coverItem.href);
+      const file = zip.file(zipPath) || zip.file(decodeURIComponent(zipPath));
+      if (file) cover = await file.async('base64'); // image bytes, base64
+    }
+  } catch { /* a bad cover never blocks the import */ }
+
   // 4. Walk the spine in order, parsing each XHTML document.
   const blocks = [];
   for (const item of spine) {
@@ -83,7 +113,7 @@ async function epubToBlocks(buffer) {
     blocks.push(...htmlToBlocks(html));
   }
 
-  return { title, blocks };
+  return { title, blocks, cover };
 }
 
 module.exports = { epubToBlocks };
